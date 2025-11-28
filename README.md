@@ -36,6 +36,42 @@ graph TD
     *   Ensures the server runs with the correct Python environment (`uv`) and working directory.
     *   Injects necessary environment variables (API Keys).
 
+## 🔄 Deep Research Workflow
+
+The "Deep Research" capability is achieved through an iterative loop driven by the Gemini 3.0 model's reasoning capabilities and the system prompt.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Agent as LlmAgent (Gemini 3.0)
+    participant Tool as Google Search Tool
+    
+    User->>Agent: "Research [Complex Topic]"
+    
+    loop Deep Research Cycle
+        Agent->>Agent: Analyze Request & Decompose
+        
+        opt Information Gathering
+            Agent->>Tool: Search(Sub-topic 1)
+            Tool-->>Agent: Search Results
+            Agent->>Tool: Search(Sub-topic 2)
+            Tool-->>Agent: Search Results
+            Agent->>Agent: Read & Verify Snippets
+        end
+        
+        Agent->>Agent: Synthesize Findings
+        
+        alt Need more info?
+            Agent->>Tool: Search(Missing Details)
+            Tool-->>Agent: New Results
+        else Sufficient Info
+            Agent->>Agent: Finalize Report
+        end
+    end
+    
+    Agent-->>User: Comprehensive Report with Citations
+```
+
 ## 🚀 Deployment & Setup
 
 ### Prerequisites
