@@ -81,12 +81,13 @@ uv sync
 ```
 
 ### 2. Configure API Key
-Edit `run_mcp.sh` to set your Google API Key:
+Create a `.env` file in the project root:
 ```bash
-# run_mcp.sh
-export GOOGLE_API_KEY="YOUR_ACTUAL_API_KEY"
+echo 'GOOGLE_API_KEY="your_api_key_here"' > .env
 ```
-*Alternatively, you can set this in your system environment or `settings.json`, but the wrapper script is the most reliable place for the server process.*
+*Note: The `.env` file is gitignored for security.*
+
+Alternatively, you can set the environment variable manually or edit `run_mcp.sh` (not recommended).
 
 ### 3. Connect to Gemini CLI
 You need to tell the Gemini CLI where to find this server. Edit your `~/.gemini/settings.json` file.

@@ -2,8 +2,15 @@
 # Navigate to the script's directory (project root)
 cd "$(dirname "$0")"
 
-# Set the API Key
-export GOOGLE_API_KEY="YOUR_API_KEY_HERE"
+# Load API Key from .env if it exists
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
+# Fallback or manual set (if .env is missing)
+if [ -z "$GOOGLE_API_KEY" ]; then
+    export GOOGLE_API_KEY="YOUR_API_KEY_HERE"
+fi
 
 # Run the server using uv
 # We assume uv is in the user's local bin or system path. 
