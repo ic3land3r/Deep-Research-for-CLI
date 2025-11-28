@@ -6,6 +6,7 @@ from google.genai import types
 from agents.planner import planner_agent
 from agents.researcher import researcher_agent
 from agents.writer import writer_agent
+from agents.reviewer import reviewer_agent
 
 from core.memory import Memory
 
@@ -41,7 +42,7 @@ class Orchestrator:
 
     async def run(self, topic: str) -> str:
         """
-        Executes the Deep Research workflow: Plan -> Research -> Write.
+        Executes the Deep Research workflow: Plan -> Research -> Write -> Review.
         """
         print(f"[Orchestrator] Starting research on: {topic}")
         self.memory.clear() # Ensure fresh memory for this run
@@ -59,36 +60,56 @@ class Orchestrator:
                 print("[Orchestrator] Failed to generate a valid plan. Falling back to single query.")
                 sub_questions = [topic]
 
-            # 2. RESEARCH (Sequential for Cycle 1)
-            print("[Orchestrator] Phase 2: Researching...")
+            # 2. RESEARCH (Parallel for Cycle 3)
+            print("[Orchestrator] Phase 2: Researching (Parallel)...")
             
-            for i, question in enumerate(sub_questions):
-                print(f"[Orchestrator] Researching sub-topic {i+1}/{len(sub_questions)}: {question}")
-                note = await self._execute_agent(researcher_agent, question, f"researcher_app_{i}")
-                
-                # Store in Memory
+            # Define a helper for parallel execution
+            async def research_task(index, question):
+                print(f"[Orchestrator] Starting research on sub-topic {index+1}: {question}")
+                note = await self._execute_agent(researcher_agent, question, f"researcher_app_{index}")
                 self.memory.add(note, metadata={"topic": question})
-                print(f"[Orchestrator] Stored {len(note)} chars in memory.")
+                print(f"[Orchestrator] Finished sub-topic {index+1}. Stored {len(note)} chars.")
+                return f"### Sub-topic: {question}\n{note}"
+
+            # Execute all tasks concurrently
+            await asyncio.gather(*[
+                research_task(i, q) for i, q in enumerate(sub_questions)
+            ])
 
             # 3. WRITE
             print("[Orchestrator] Phase 3: Writing...")
-            # Retrieve relevant context from memory (or all of it if we just want to dump)
-            # For Cycle 2, let's query the memory for the original topic to get the most relevant chunks,
-            # OR just dump everything if it fits. Let's try a hybrid: Query for each sub-question again?
-            # Simpler: Just dump all documents since we have a small number of sub-questions.
-            # But `memory.query` is the feature we want to test.
-            # Let's query for the main topic.
-            
-            # Actually, to prove Memory works, let's query for the *original topic* and see what comes back.
-            # But since we just put everything in, maybe we should just retrieve all?
-            # Chroma doesn't have a "get all" easily without ID tracking.
-            # So let's just query for the topic.
-            relevant_context = self.memory.query(topic, n_results=10) # Get top 10 chunks
+            relevant_context = self.memory.query(topic, n_results=10)
             full_context = f"Original Topic: {topic}\n\nResearch Notes (from Memory):\n" + "\n\n".join(relevant_context)
             
-            final_report = await self._execute_agent(writer_agent, full_context, "writer_app")
+            draft_report = await self._execute_agent(writer_agent, full_context, "writer_app")
+            
+            # 4. REVIEW (Feedback Loop)
+            print("[Orchestrator] Phase 4: Reviewing...")
+            
+            review_prompt = f"""
+            Review the following report for accuracy and completeness based on the topic '{topic}'.
+            Report:
+            {draft_report}
+            """
+            review_result = await self._execute_agent(reviewer_agent, review_prompt, "reviewer_app")
+            
+            if "FAIL" in review_result:
+                print("[Orchestrator] Review failed. Revising...")
+                print(f"[Orchestrator] Feedback: {review_result}")
+                
+                revision_prompt = f"""
+                The previous draft was rejected.
+                Feedback: {review_result}
+                
+                Please rewrite the report to address this feedback.
+                Original Context:
+                {full_context}
+                """
+                final_report = await self._execute_agent(writer_agent, revision_prompt, "writer_app_revision")
+            else:
+                print("[Orchestrator] Review passed.")
+                final_report = draft_report
             
             return final_report
         finally:
             self.memory.clear() # Wipe memory after run
-
