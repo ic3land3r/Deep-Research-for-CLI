@@ -36,13 +36,13 @@ graph TD
     *   Ensures the server runs with the correct Python environment (`uv`) and working directory.
     *   Injects necessary environment variables (API Keys).
 
-## 🔄 Deep Research Workflow (Cycle 1)
+## 🔄 Deep Research Workflow (Cycle 2)
 
-The system uses a **Hierarchical Planner-Executor** architecture:
+The system uses a **Hierarchical Planner-Executor** architecture with **Session-Scoped Memory**:
 
 1.  **Planner Agent**: Decomposes the user's query into a structured research plan (DAG).
-2.  **Researcher Agent**: Executed for each step of the plan, performing targeted Google Searches.
-3.  **Writer Agent**: Aggregates all findings into a final, CLI-optimized Markdown report.
+2.  **Researcher Agent**: Executed for each step of the plan. Findings are stored in a **Vector Database** (ChromaDB).
+3.  **Writer Agent**: Retrieves relevant context from Memory and synthesizes a final report.
 
 ```mermaid
 sequenceDiagram
