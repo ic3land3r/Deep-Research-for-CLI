@@ -1,0 +1,26 @@
+  × Failed to build `pypika==0.48.9`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit status: 1)
+
+      [stderr]
+      Traceback (most recent call last):
+        File "<string>", line 14, in <module>
+          requires = get_requires_for_build({})
+        File "/home/lander/.cache/uv/builds-v0/.tmpQFry3g/lib64/python3.14/site-packages/setuptools/build_meta.py", line 331, in get_requires_for_build_wheel
+          return self._get_build_requires(config_settings, requirements=[])
+                 ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/home/lander/.cache/uv/builds-v0/.tmpQFry3g/lib64/python3.14/site-packages/setuptools/build_meta.py", line 301, in _get_build_requires
+          self.run_setup()
+          ~~~~~~~~~~~~~~^^
+        File "/home/lander/.cache/uv/builds-v0/.tmpQFry3g/lib64/python3.14/site-packages/setuptools/build_meta.py", line 512, in run_setup
+          super().run_setup(setup_script=setup_script)
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/home/lander/.cache/uv/builds-v0/.tmpQFry3g/lib64/python3.14/site-packages/setuptools/build_meta.py", line 317, in run_setup
+          exec(code, locals())
+          ~~~~^^^^^^^^^^^^^^^^
+        File "<string>", line 38, in <module>
+        File "<string>", line 20, in version
+      AttributeError: module 'ast' has no attribute 'Str'
+
+      hint: This usually indicates a problem with the package or the build environment.
+  help: If you want to add the package regardless of the failed resolution, provide the `--frozen` flag to skip locking and syncing.

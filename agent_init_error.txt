@@ -1,0 +1,4 @@
+Agent init failed: 1 validation error for LlmAgent
+system_instruction
+  Extra inputs are not permitted [type=extra_forbidden, input_value='\nYou are a Deep Researc...s verify with search.\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden

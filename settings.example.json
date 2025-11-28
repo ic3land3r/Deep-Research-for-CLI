@@ -1,0 +1,33 @@
+{
+    "security": {
+        "auth": {
+            "selectedType": "gemini-api-key"
+        }
+    },
+    "general": {
+        "previewFeatures": true
+    },
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/coverage/**": true,
+        "**/.venv/**": true,
+        "**/tmp/**": true
+    },
+    "files.watcherLimit": 500,
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/*.code-search": true
+    },
+    "mcpServers": {
+        "deep-research": {
+            "command": "/ABSOLUTE/PATH/TO/adk-deep-research/run_mcp.sh",
+            "args": [],
+            "env": {}
+        }
+    }
+}

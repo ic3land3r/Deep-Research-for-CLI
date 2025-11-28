@@ -1,0 +1,1 @@
+-rw-r--r-- 1 lander lander 616 26 ное 23:07 /home/lander/.gemini/settings.json
