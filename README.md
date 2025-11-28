@@ -2,69 +2,82 @@
 
 This repository hosts a **Model Context Protocol (MCP)** server that provides a "Deep Research" capability to the Gemini CLI. It leverages **Gemini 3.0 Pro** and **Google Search** to perform exhaustive, multi-step research on complex topics.
 
-## 🏗️ Architecture
+## 🏗️ Functional Architecture
 
-The system is built using a modular architecture combining the **Google Agent Development Kit (ADK)** and **FastMCP**.
+The system implements a **Level 3 Autonomous Agent** architecture, featuring hierarchical planning, parallel execution, session-scoped memory, and self-correction loops.
 
-```mermaid
-graph TD
-    Client[Gemini CLI] <-->|MCP Protocol stdio| Wrapper[run_mcp.sh]
-    Wrapper <-->|Launches| Server[server.py FastMCP]
-    Server <-->|Async Call| Agent[agent.py LlmAgent]
-    Agent <-->|Uses| Runner[ADK Runner]
-    Runner <-->|Manages| Session[InMemorySessionService]
-    Runner <-->|Invokes| Model[Gemini 3.0 Pro]
-    Model <-->|Calls| Tool[Google Search Tool]
-```
+### 1. Core Components
 
-### Key Components
+| Component | Role | Implementation Details |
+| :--- | :--- | :--- |
+| **Orchestrator** | **The Controller** | Manages the lifecycle of the research request. It initializes the session, coordinates agent execution, manages the Vector DB, and enforces the feedback loop. |
+| **Planner Agent** | **The Strategist** | Decomposes complex user queries into a Directed Acyclic Graph (DAG) of sub-questions. Uses `gemini-3-pro-preview` for reasoning. |
+| **Researcher Agent** | **The Worker** | Executed in **PARALLEL** for each sub-question. It uses the `google_search` tool to gather facts and summarizes them into concise notes. |
+| **Memory Layer** | **The Context** | A **Session-Scoped Vector Database** (ChromaDB) that stores research notes. It allows the Writer to retrieve semantically relevant information based on the topic. |
+| **Writer Agent** | **The Synthesizer** | Aggregates retrieved context and generates a comprehensive report using **Chain of Density** prompting to maximize information value. |
+| **Reviewer Agent** | **The Critic** | Analyzes the draft report for accuracy and completeness. If it rejects the draft ("FAIL"), it triggers a revision cycle. |
 
-1.  **`server.py` (The Interface)**:
-    *   Built with `FastMCP`.
-    *   Exposes a single tool: `perform_deep_research`.
-    *   Handles the MCP protocol communication with the Gemini CLI over `stdio`.
-    *   Asynchronously delegates the actual work to the agent.
+### 2. Data Flow & Execution Pipeline
 
-2.  **`agent.py` (The Brain)**:
-    *   Defines an `LlmAgent` named `deep_researcher`.
-    *   **Model**: Uses `gemini-3-pro-preview` for advanced reasoning and synthesis.
-    *   **Tools**: Equipped with the `google_search` tool from ADK.
-    *   **Execution**: Uses `google.adk.runners.Runner` and `InMemorySessionService` to execute the agent loop asynchronously. This ensures proper state management and event handling required by the ADK.
+The workflow follows a strict **Plan -> Research -> Write -> Review** cycle:
 
-3.  **`run_mcp.sh` (The Launcher)**:
-    *   A robust wrapper script.
-    *   Ensures the server runs with the correct Python environment (`uv`) and working directory.
-    *   Injects necessary environment variables (API Keys).
+1.  **Initialization**: The `Orchestrator` creates a fresh `Memory` instance (wiped after execution).
+2.  **Planning Phase**: The `Planner` breaks the topic into $N$ sub-questions.
+3.  **Research Phase (Parallel)**:
+    *   The `Orchestrator` spawns $N$ concurrent `Researcher` tasks.
+    *   Each researcher gathers data and calls `memory.add()` to store findings.
+4.  **Synthesis Phase**:
+    *   The `Orchestrator` queries `Memory` for the top $K$ relevant chunks.
+    *   The `Writer` generates a `draft_report`.
+5.  **Verification Phase (Feedback Loop)**:
+    *   The `Reviewer` evaluates the `draft_report`.
+    *   **Pass**: The report is returned to the user.
+    *   **Fail**: The `Writer` is invoked again with specific feedback to generate a `final_report`.
 
-## 🔄 Deep Research Workflow (Cycle 3)
-
-The system uses a **Hierarchical Planner-Executor** architecture with **Self-Correction** and **Parallel Execution**:
-
-1.  **Planner Agent**: Decomposes the user's query into a structured research plan (DAG).
-2.  **Researcher Agent**: Executed in **PARALLEL** for all steps, significantly reducing wait time. Findings are stored in a **Vector Database** (ChromaDB).
-3.  **Writer Agent**: Retrieves relevant context from Memory and synthesizes a draft report using **Chain of Density** prompting.
-4.  **Reviewer Agent**: Critiques the draft. If it fails quality checks, the Writer is invoked again to fix issues (Feedback Loop).
+### 3. Sequence Diagram
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Orchestrator
-    participant Planner
-    participant Researcher
-    participant Writer
+    participant Orch as Orchestrator
+    participant Plan as Planner
+    participant Res as Researcher (xN)
+    participant Mem as Memory (VectorDB)
+    participant Write as Writer
+    participant Rev as Reviewer
     
-    User->>Orchestrator: "Research [Topic]"
-    Orchestrator->>Planner: Plan Research
-    Planner-->>Orchestrator: List of Sub-Questions
+    User->>Orch: "Research [Topic]"
+    activate Orch
     
-    loop For each Sub-Question
-        Orchestrator->>Researcher: Research(Sub-Question)
-        Researcher-->>Orchestrator: Verified Facts
+    Note over Orch: Phase 1: Planning
+    Orch->>Plan: Decompose Topic
+    Plan-->>Orch: List[Sub-Questions]
+    
+    Note over Orch: Phase 2: Research (Parallel)
+    par For each Sub-Question
+        Orch->>Res: Research(Question)
+        Res->>Res: Google Search
+        Res->>Mem: Store(Notes)
     end
     
-    Orchestrator->>Writer: Synthesize(All Notes)
-    Writer-->>Orchestrator: Final Report
-    Orchestrator-->>User: Report
+    Note over Orch: Phase 3: Writing
+    Orch->>Mem: Query(Topic)
+    Mem-->>Orch: Relevant Context
+    Orch->>Write: Synthesize(Context)
+    Write-->>Orch: Draft Report
+    
+    Note over Orch: Phase 4: Review
+    Orch->>Rev: Critique(Draft)
+    alt Review Passed
+        Rev-->>Orch: PASS
+    else Review Failed
+        Rev-->>Orch: FAIL + Feedback
+        Orch->>Write: Revise(Draft + Feedback)
+        Write-->>Orch: Final Report
+    end
+    
+    Orch-->>User: Final Report
+    deactivate Orch
 ```
 
 ## 🚀 Deployment & Setup
