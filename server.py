@@ -1,21 +1,20 @@
 from fastmcp import FastMCP
-from agent import run_research
+from core.orchestrator import Orchestrator
 
-# Initialize the MCP Server
-mcp = FastMCP("Gemini 3.0 Deep Research Agent")
+# Initialize FastMCP server
+mcp = FastMCP("Deep Research")
 
 @mcp.tool()
 async def perform_deep_research(topic: str) -> str:
     """
-    Performs deep, multi-step research on a complex topic using a Gemini 3.0 agent.
-    Use this tool when the user asks for a "report", "deep dive", or "comprehensive analysis".
+    Performs a deep, multi-step research on a given topic using Gemini 3.0 Pro.
     
     Args:
-        topic: The research query or topic to investigate.
+        topic: The research topic or question.
     """
     try:
-        # Delegate execution to the ADK agent
-        result = await run_research(topic)
+        orchestrator = Orchestrator()
+        result = await orchestrator.run(topic)
         return result
     except Exception as e:
         return f"Research failed due to error: {str(e)}"

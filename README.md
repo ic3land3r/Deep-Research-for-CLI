@@ -36,40 +36,34 @@ graph TD
     *   Ensures the server runs with the correct Python environment (`uv`) and working directory.
     *   Injects necessary environment variables (API Keys).
 
-## 🔄 Deep Research Workflow
+## 🔄 Deep Research Workflow (Cycle 1)
 
-The "Deep Research" capability is achieved through an iterative loop driven by the Gemini 3.0 model's reasoning capabilities and the system prompt.
+The system uses a **Hierarchical Planner-Executor** architecture:
+
+1.  **Planner Agent**: Decomposes the user's query into a structured research plan (DAG).
+2.  **Researcher Agent**: Executed for each step of the plan, performing targeted Google Searches.
+3.  **Writer Agent**: Aggregates all findings into a final, CLI-optimized Markdown report.
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Agent as LlmAgent (Gemini 3.0)
-    participant Tool as Google Search Tool
+    participant Orchestrator
+    participant Planner
+    participant Researcher
+    participant Writer
     
-    User->>Agent: "Research [Complex Topic]"
+    User->>Orchestrator: "Research [Topic]"
+    Orchestrator->>Planner: Plan Research
+    Planner-->>Orchestrator: List of Sub-Questions
     
-    loop Deep Research Cycle
-        Agent->>Agent: Analyze Request & Decompose
-        
-        opt Information Gathering
-            Agent->>Tool: Search(Sub-topic 1)
-            Tool-->>Agent: Search Results
-            Agent->>Tool: Search(Sub-topic 2)
-            Tool-->>Agent: Search Results
-            Agent->>Agent: Read & Verify Snippets
-        end
-        
-        Agent->>Agent: Synthesize Findings
-        
-        alt Need more info?
-            Agent->>Tool: Search(Missing Details)
-            Tool-->>Agent: New Results
-        else Sufficient Info
-            Agent->>Agent: Finalize Report
-        end
+    loop For each Sub-Question
+        Orchestrator->>Researcher: Research(Sub-Question)
+        Researcher-->>Orchestrator: Verified Facts
     end
     
-    Agent-->>User: Comprehensive Report with Citations
+    Orchestrator->>Writer: Synthesize(All Notes)
+    Writer-->>Orchestrator: Final Report
+    Orchestrator-->>User: Report
 ```
 
 ## 🚀 Deployment & Setup

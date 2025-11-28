@@ -3,7 +3,7 @@
 cd "$(dirname "$0")"
 
 # Set the API Key
-export GOOGLE_API_KEY="api_key"
+export GOOGLE_API_KEY="YOUR_API_KEY_HERE"
 
 # Run the server using uv
 # We assume uv is in the user's local bin or system path. 
