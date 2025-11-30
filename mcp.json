@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "deep-research": {
+      "command": "/home/lander/Projects/adk-python/adk-deep-research/run_mcp.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}

@@ -80,6 +80,18 @@ sequenceDiagram
     deactivate Orch
 ```
 
+### 4. Recursive & Agentic Capabilities
+
+This server is designed to work in two environments:
+
+1.  **Gemini CLI (Recursive Mode)**:
+    *   **Recursive Reasoning**: The server can "query back" the Gemini CLI to perform complex analysis (e.g., `analyze_complexity`).
+    *   **Structured Reports**: Generates beautiful Markdown reports directly in the terminal.
+
+2.  **Google Antigravity (Agentic Mode)**:
+    *   **Mission Control**: Integrates with Antigravity's "Architect" agent.
+    *   **Project Intelligence**: Exposes tools like `describe_data_schema` and `run_integration_suite` to help agents understand the codebase.
+
 ## 🚀 Deployment & Setup
 
 ### Prerequisites
@@ -117,18 +129,27 @@ You need to tell the Gemini CLI where to find this server. Edit your `~/.gemini/
 ```
 *Replace `/ABSOLUTE/PATH/TO/...` with the actual full path to the cloned repository.*
 
+### 4. Connect to Google Antigravity
+The project includes a `mcp.json` file for auto-discovery.
+
+*   **Auto-Discovery**: Open the project folder in Antigravity, and it should detect the server.
+*   **Manual**: If needed, point Antigravity to the `mcp.json` file in the project root.
+
 ## 📖 Usage
 
 Once configured, restart your Gemini CLI.
 
 1.  **Verify Installation**:
-    Type `/tools` in the CLI. You should see `perform_deep_research` listed.
+    Type `/tools` in the CLI. You should see `perform_deep_research` and `analyze_complexity` listed.
 
 2.  **Trigger the Agent**:
     Ask a complex question that requires research.
     > "Perform a deep dive into the current state of Solid State Battery manufacturing challenges in 2025."
 
-    > "Research the latest proton version issues with Black Desert Online."
+3.  **Recursive Analysis**:
+    Ask the CLI to analyze a file in the project.
+    > "Analyze the complexity of server.py"
+    *(The CLI will prompt you to approve the sampling request)*
 
 ## 🔧 Troubleshooting
 
