@@ -4,6 +4,8 @@ from utils.sampling import safe_sampling_request
 from google.genai import types
 from typing import Optional
 
+from google.adk.tools.tool_context import ToolContext
+
 class AskHostTool(BaseTool):
     def __init__(self, ctx: Context):
         super().__init__(
@@ -12,7 +14,11 @@ class AskHostTool(BaseTool):
         )
         self.ctx = ctx
 
-    async def run_async(self, question: str) -> str:
+    async def run_async(self, *, args: dict, tool_context: Optional[ToolContext] = None) -> str:
+        question = args.get("question")
+        if not question:
+            return "Error: No question provided."
+
         prompt = f"The research agent needs information from you/the host environment:\n\n{question}\n\nPlease provide this information so the research can continue."
         
         # We use 'includeContext="none"' to avoid confusing the model with the agent's internal monologue
