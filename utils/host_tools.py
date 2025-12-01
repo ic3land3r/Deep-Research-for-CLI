@@ -32,7 +32,8 @@ class AskHostTool(BaseTool):
         return response
 
     def _get_declaration(self) -> Optional[types.FunctionDeclaration]:
-        print(f"DEBUG: AskHostTool._get_declaration called for {self.name}")
+        # Debug logging removed to prevent stdout pollution
+        pass
         return types.FunctionDeclaration(
             name=self.name,
             description=self.description,

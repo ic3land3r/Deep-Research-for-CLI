@@ -209,6 +209,10 @@ Once configured, restart your Gemini CLI.
     ./run_mcp.sh
     ```
 
+**"calling 'initialize': EOF" Error**:
+*   This error happens if the server prints non-JSON text (like debug prints) to `stdout` during startup.
+*   **Fix**: The `run_mcp.sh` script sets `PYTHONUNBUFFERED=1` and ensures only the JSON-RPC stream uses `stdout`. Always use the script, do not run `server.py` directly.
+
 **"LlmAgent object has no attribute run"**:
 *   This error occurs if you try to use the synchronous `.run()` method on an ADK agent.
 *   **Fix**: The code has been updated to use `Runner` and `run_async`. Ensure you have the latest version of `agent.py`.
