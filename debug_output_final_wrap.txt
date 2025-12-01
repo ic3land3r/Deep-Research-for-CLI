@@ -1,0 +1,33 @@
+/home/lander/Projects/adk-python/src/google/adk/runners.py:1293: DeprecationWarning: deprecated
+  save_input_blobs_as_artifacts=run_config.save_input_blobs_as_artifacts,
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+Debugging LlmAgent with Google Search (Wrapper Approach)...
+Agent tools: [<google.adk.tools.function_tool.FunctionTool object at 0x7fd72c8da090>, <google.adk.tools.function_tool.FunctionTool object at 0x7fd72c8da5d0>]
+Sending message...
+Event: model_version='gemini-3-pro-preview' content=Content(
+  parts=[
+    Part(
+      function_call=FunctionCall(
+        args={
+          'query': 'latest python version'
+        },
+        id='adk-487b94c3-8fb2-44cf-aeb5-1e7550f04768',
+        name='google_search_wrapper'
+      ),
+      thought_signature=b'\x12\xeb\x01\n\xe8\x01\x01r\xc8\xda|&\xfe}\xeexY\xa6 \xf8\xd3<n\xe9\x1b\n\xde\xf5\xc0%\xd0<\x87\xb3\x08\xb0n \xfd!\xcd\x9f\xa4v\xad\xb7\xd74@q\x10q\xb4\x9a\xe0\x9e\xc1G\xe1!f\x14M\x9a\x9c\xd2EP\x02\x08\xc6\xe8\x83\xe5\xb3\x00C\x1d\x1c\xc7\xeeb\xd2\x08`(\xb0\x9e6\xf6\x81\x88T\xb9\x08se...'
+    ),
+  ],
+  role='model'
+) grounding_metadata=None partial=None turn_complete=None finish_reason=<FinishReason.STOP: 'STOP'> error_code=None error_message=None interrupted=None custom_metadata=None usage_metadata=GenerateContentResponseUsageMetadata(
+  candidates_token_count=20,
+  prompt_token_count=97,
+  prompt_tokens_details=[
+    ModalityTokenCount(
+      modality=<MediaModality.TEXT: 'TEXT'>,
+      token_count=97
+    ),
+  ],
+  thoughts_token_count=43,
+  total_token_count=160
+) live_session_resumption_update=None input_transcription=None output_transcription=None avg_logprobs=None logprobs_result=None cache_metadata=None citation_metadata=None invocation_id='e-3f59b44b-b034-4c84-b0a5-303c24e09d80' author='debug_researcher' actions=EventActions(skip_summarization=None, state_delta={}, artifact_delta={}, transfer_to_agent=None, escalate=None, requested_auth_configs={}, requested_tool_confirmations={}, compaction=None, end_of_agent=None, agent_state=None, rewind_before_invocation_id=None) long_running_tool_ids=set() branch=None id='31e492f4-35b9-4a86-a7cd-2c55c4d60e9f' timestamp=1764549390.891386
+Caught exception: BaseTool.run_async() got an unexpected keyword argument 'query'

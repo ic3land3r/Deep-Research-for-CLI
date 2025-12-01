@@ -1,0 +1,2 @@
+FunctionTool inherits from BaseTool: True
+FunctionTool MRO: [<class 'google.adk.tools.function_tool.FunctionTool'>, <class 'google.adk.tools.base_tool.BaseTool'>, <class 'abc.ABC'>, <class 'object'>]

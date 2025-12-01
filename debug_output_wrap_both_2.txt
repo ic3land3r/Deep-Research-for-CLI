@@ -1,0 +1,6 @@
+/home/lander/Projects/adk-python/src/google/adk/runners.py:1293: DeprecationWarning: deprecated
+  save_input_blobs_as_artifacts=run_config.save_input_blobs_as_artifacts,
+Debugging LlmAgent with Google Search...
+Agent tools: [<google.adk.tools.function_tool.FunctionTool object at 0x7fa5c8923770>, <google.adk.tools.function_tool.FunctionTool object at 0x7fa5c86dab70>]
+Sending message...
+Caught exception: <utils.host_tools.AskHostTool object at 0x7fa5c86daba0> is not a callable object

@@ -1,0 +1,33 @@
+/home/lander/Projects/adk-python/src/google/adk/runners.py:1293: DeprecationWarning: deprecated
+  save_input_blobs_as_artifacts=run_config.save_input_blobs_as_artifacts,
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+Debugging LlmAgent with Google Search (Wrapper Approach)...
+Agent tools: [<google.adk.tools.function_tool.FunctionTool object at 0x7f57aeed2b70>, <google.adk.tools.function_tool.FunctionTool object at 0x7f57aeed2bd0>]
+Sending message...
+Event: model_version='gemini-3-pro-preview' content=Content(
+  parts=[
+    Part(
+      function_call=FunctionCall(
+        args={
+          'query': 'latest python version'
+        },
+        id='adk-bdd7f08a-3677-4450-abe9-4ecf85ef07a2',
+        name='google_search_wrapper'
+      ),
+      thought_signature=b'\x12\x80\x02\n\xfd\x01\x01r\xc8\xda|\x87g|\xae\xe6{DWj\xfc\x83\x8e\xf1\xac\x9c`;i|$k\xed\x05\xf4\xc8\xe4!7\xfc\xc8\x19\xcc\x17J\xb5E\x01\x81\x81aLL\x90\x0b6Cd\xcaa\xa3\x111\x99\xd6t\xb3\xf60\x01Ba\xe3\x0f\x1d\xb4\xb7\xd2\xf4G\x1b\xdc\xe9\x00Z\xa5\xa8\x83\r\xbf\x1a4\xb1F\xf7\x01\xc7...'
+    ),
+  ],
+  role='model'
+) grounding_metadata=None partial=None turn_complete=None finish_reason=<FinishReason.STOP: 'STOP'> error_code=None error_message=None interrupted=None custom_metadata=None usage_metadata=GenerateContentResponseUsageMetadata(
+  candidates_token_count=20,
+  prompt_token_count=97,
+  prompt_tokens_details=[
+    ModalityTokenCount(
+      modality=<MediaModality.TEXT: 'TEXT'>,
+      token_count=97
+    ),
+  ],
+  thoughts_token_count=44,
+  total_token_count=161
+) live_session_resumption_update=None input_transcription=None output_transcription=None avg_logprobs=None logprobs_result=None cache_metadata=None citation_metadata=None invocation_id='e-3358887e-c8be-400e-9c63-45102653b1db' author='debug_researcher' actions=EventActions(skip_summarization=None, state_delta={}, artifact_delta={}, transfer_to_agent=None, escalate=None, requested_auth_configs={}, requested_tool_confirmations={}, compaction=None, end_of_agent=None, agent_state=None, rewind_before_invocation_id=None) long_running_tool_ids=set() branch=None id='228418ec-5a67-46ea-a8e3-065cbf779e6e' timestamp=1764549460.371401
+Caught exception: <class 'google.adk.tools.google_search_tool.GoogleSearchTool'> is not implemented

@@ -1,0 +1,27 @@
+/home/lander/Projects/adk-python/src/google/adk/runners.py:1293: DeprecationWarning: deprecated
+  save_input_blobs_as_artifacts=run_config.save_input_blobs_as_artifacts,
+Debugging LlmAgent with Google Search...
+Agent tools: [<google.adk.tools.google_search_tool.GoogleSearchTool object at 0x7f68f7dc4d10>, <utils.host_tools.AskHostTool object at 0x7f68f72ba720>]
+Sending message...
+DEBUG: process_llm_request called with <class 'google.adk.tools.tool_context.ToolContext'> and <class 'google.adk.models.llm_request.LlmRequest'>
+DEBUG: llm_request: model='gemini-3-pro-preview' contents=[Content(
+  parts=[
+    Part(
+      text='What is the latest version of Python?'
+    ),
+  ],
+  role='user'
+)] config=GenerateContentConfig(
+  system_instruction="""You are a researcher.
+
+You are an agent. Your internal name is "debug_researcher".""",
+  tools=[
+    Tool(
+      google_search=GoogleSearch()
+    ),
+  ]
+) live_connect_config=LiveConnectConfig(
+  input_audio_transcription=AudioTranscriptionConfig(),
+  output_audio_transcription=AudioTranscriptionConfig()
+) tools_dict={} cache_config=None cache_metadata=None cacheable_contents_token_count=None
+Caught exception: Intentional stop to inspect output

@@ -4,16 +4,21 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
 from agents.planner import planner_agent
-from agents.researcher import researcher_agent
+from agents.planner import planner_agent
+from agents.researcher import get_researcher_agent
+from agents.writer import writer_agent
 from agents.writer import writer_agent
 from agents.reviewer import reviewer_agent
 
 from core.memory import Memory
 
+from utils.host_tools import create_ask_host_tool
+
 class Orchestrator:
-    def __init__(self):
+    def __init__(self, ctx=None):
         self.session_service = InMemorySessionService()
         self.memory = Memory()
+        self.ctx = ctx
 
     async def _execute_agent(self, agent, prompt: str, app_name: str) -> str:
         """Helper to execute a single agent run."""
@@ -66,7 +71,17 @@ class Orchestrator:
             # Define a helper for parallel execution
             async def research_task(index, question):
                 print(f"[Orchestrator] Starting research on sub-topic {index+1}: {question}")
-                note = await self._execute_agent(researcher_agent, question, f"researcher_app_{index}")
+            async def research_task(index, question):
+                print(f"[Orchestrator] Starting research on sub-topic {index+1}: {question}")
+                
+                # Create a researcher agent with access to the host tool if context is available
+                extra_tools = []
+                if self.ctx:
+                    extra_tools.append(create_ask_host_tool(self.ctx))
+                
+                agent = get_researcher_agent(extra_tools=extra_tools)
+                
+                note = await self._execute_agent(agent, question, f"researcher_app_{index}")
                 self.memory.add(note, metadata={"topic": question})
                 print(f"[Orchestrator] Finished sub-topic {index+1}. Stored {len(note)} chars.")
                 return f"### Sub-topic: {question}\n{note}"

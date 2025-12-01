@@ -1,0 +1,3 @@
+
+Signature(FunctionTool.process_llm_request):
+(self, *, tool_context: 'ToolContext', llm_request: 'LlmRequest') -> 'None'

@@ -1,0 +1,7 @@
+
+Signature(google_search.run_async):
+Traceback (most recent call last):
+  File "/home/lander/Projects/adk-python/adk-deep-research/inspect_tools.py", line 5, in <module>
+    print(inspect.signature(google_search.run_async))
+                            ^^^^^^^^^^^^^
+NameError: name 'google_search' is not defined

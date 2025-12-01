@@ -1,0 +1,6 @@
+/home/lander/Projects/adk-python/src/google/adk/runners.py:1293: DeprecationWarning: deprecated
+  save_input_blobs_as_artifacts=run_config.save_input_blobs_as_artifacts,
+Debugging LlmAgent with Google Search...
+Agent tools: [<google.adk.tools.google_search_tool.GoogleSearchTool object at 0x7fd13b7ec920>, <utils.host_tools.AskHostTool object at 0x7fd13acda2a0>]
+Sending message...
+Caught exception: object NoneType can't be used in 'await' expression

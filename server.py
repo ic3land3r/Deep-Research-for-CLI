@@ -6,15 +6,16 @@ from utils.sampling import safe_sampling_request
 mcp = FastMCP("Deep Research")
 
 @mcp.tool()
-async def perform_deep_research(topic: str) -> str:
+async def perform_deep_research(ctx: Context, topic: str) -> str:
     """
     Performs a deep, multi-step research on a given topic using Gemini 3.0 Pro.
     
     Args:
+        ctx: The FastMCP context.
         topic: The research topic or question.
     """
     try:
-        orchestrator = Orchestrator()
+        orchestrator = Orchestrator(ctx=ctx)
         result = await orchestrator.run(topic)
         return result
     except Exception as e:

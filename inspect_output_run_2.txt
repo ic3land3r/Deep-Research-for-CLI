@@ -1,0 +1,3 @@
+
+Signature(google_search.run_async):
+(*, args: 'dict[str, Any]', tool_context: 'ToolContext') -> 'Any'
