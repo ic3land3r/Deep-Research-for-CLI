@@ -87,3 +87,20 @@ graph TD
         Researcher -.->|Calls| Integration[run_integration_suite]
     end
 ```
+
+## Communication Protocol & "Recursive" Logic
+
+The architecture relies on a bidirectional flow enabled by the Model Context Protocol (MCP):
+
+1.  **Host $\rightarrow$ Server (Tool Call):**
+    *   **Mechanism:** Standard MCP Tool Execution.
+    *   **Purpose:** The Gemini CLI (Host) delegates the complex "Deep Research" task to the MCP Server.
+    *   **Flow:** `User` $\rightarrow$ `Gemini CLI` $\rightarrow$ `perform_deep_research()`
+
+2.  **Server $\rightarrow$ Host (Sampling / "Ask Host"):**
+    *   **Mechanism:** **MCP Sampling Request** (`ctx.session.send_sampling_request`).
+    *   **Purpose:** The Server is isolated and lacks credentials/tools. It "asks" the Host to perform actions on its behalf.
+    *   **Flow:** `Researcher Agent` $\rightarrow$ `AskHostTool` $\rightarrow$ **Sampling Request** $\rightarrow$ `Gemini CLI`
+    *   **Outcome:** The Gemini CLI receives the request, uses its **native tools** (Google Search, Terminal, Browser) to get the answer, and returns it to the Server.
+
+> **Why this matters:** This allows the "Brain" (Deep Research Agent) to run in a sandboxed server while still leveraging the "Hands" (Tools & Auth) of the user's local environment.
