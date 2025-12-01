@@ -136,6 +136,7 @@ The architecture relies on a bidirectional flow enabled by the Model Context Pro
     *   **Purpose:** The Server is isolated and lacks credentials/tools. It "asks" the Host to perform actions on its behalf.
     *   **Flow:** `Researcher Agent` $\rightarrow$ `AskHostTool` $\rightarrow$ **Sampling Request** $\rightarrow$ `Gemini CLI`
     *   **Outcome:** The Gemini CLI receives the request, uses its **native tools** (Google Search, Terminal, Browser) to get the answer, and returns it to the Server.
+    *   **User Interaction (Critical):** If the Host needs to run a sensitive command (e.g., `sudo`, file deletion) or requires clarification, it will **prompt the user**. The Deep Research Server **waits asynchronously** for this entire process to complete before resuming.
 
 > **Why this matters:** This allows the "Brain" (Deep Research Agent) to run in a sandboxed server while still leveraging the "Hands" (Tools & Auth) of the user's local environment.
 
