@@ -1,3 +1,0 @@
-
-Signature(FunctionTool._get_declaration):
-(self) -> 'Optional[types.FunctionDeclaration]'
