@@ -1,6 +1,0 @@
-
-Signature(google_search._get_declaration):
-() -> 'Optional[types.FunctionDeclaration]'
-
-Return annotation:
-Optional[types.FunctionDeclaration]
