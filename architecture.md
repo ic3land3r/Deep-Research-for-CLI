@@ -78,5 +78,12 @@ graph TD
         AskHostTool -->|Sampling Request| Host
         Host -->|Executes| GoogleSearch[Google Search]
         Host -->|Executes| Terminal[Local Terminal]
+        Host -->|Executes| Browser[Browser]
+    end
+    
+    subgraph "Tools"
+        Researcher -.->|Calls| Analyze[analyze_complexity]
+        Researcher -.->|Calls| Schema[get_db_schema]
+        Researcher -.->|Calls| Integration[run_integration_suite]
     end
 ```
