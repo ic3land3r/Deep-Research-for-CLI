@@ -88,9 +88,25 @@ class Orchestrator:
             # 2. RESEARCH (Parallel with Deep Dive for thin answers)
             sys.stderr.write("[Orchestrator] Phase 2: Researching (Parallel with Deep Dive)...\n")
             
-            # Configuration for Deep Dive
-            MIN_CHARS_THRESHOLD = 200  # Answers below this trigger a deep dive
+            # Configuration for Deep Dive (HYBRID: char count + fact density)
+            MIN_CHARS_THRESHOLD = 300  # Raised threshold
+            MIN_FACTS_THRESHOLD = 3    # Minimum bullet points, stats, or URLs
             MAX_DEEP_DIVE_DEPTH = 1    # Maximum recursion depth
+            
+            def count_facts(text: str) -> int:
+                """Count substantive facts in researcher output."""
+                import re
+                bullets = len(re.findall(r'^[\s]*[-*•]\s', text, re.MULTILINE))  # Bullet points
+                stats = len(re.findall(r'\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[BMK]?|\d{4}', text))  # Percentages, money, years
+                urls = len(re.findall(r'https?://', text))  # URLs
+                return bullets + stats + urls
+            
+            def is_thin_answer(text: str) -> bool:
+                """Determine if answer lacks substance (hybrid metric)."""
+                char_count = len(text)
+                fact_count = count_facts(text)
+                is_thin = char_count < MIN_CHARS_THRESHOLD or fact_count < MIN_FACTS_THRESHOLD
+                return is_thin, char_count, fact_count
             
             # Define a helper for parallel execution with deep dive
             async def research_task(index, question, depth=0):
@@ -108,9 +124,10 @@ class Orchestrator:
                 
                 note = await self._execute_agent(agent, augmented_question, f"researcher_app_{index}_d{depth}")
                 
-                # Deep Dive: Check if answer is "thin"
-                if len(note) < MIN_CHARS_THRESHOLD and depth < MAX_DEEP_DIVE_DEPTH:
-                    sys.stderr.write(f"[Orchestrator] DEEP DIVE triggered for '{question}' (only {len(note)} chars)\n")
+                # Deep Dive: Check if answer is "thin" using HYBRID metric
+                thin, chars, facts = is_thin_answer(note)
+                if thin and depth < MAX_DEEP_DIVE_DEPTH:
+                    sys.stderr.write(f"[Orchestrator] DEEP DIVE triggered for '{question}' (chars={chars}, facts={facts})\n")
                     
                     # Generate a more specific follow-up question
                     follow_up = f"Provide MORE DETAILED information about: {question}. Include specific facts, data, and statistics."
