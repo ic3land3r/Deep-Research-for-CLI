@@ -1,18 +1,37 @@
 import asyncio
+import re
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
 from agents.planner import planner_agent
-from agents.planner import planner_agent
 from agents.researcher import get_researcher_agent
-from agents.writer import writer_agent
 from agents.writer import writer_agent
 from agents.reviewer import reviewer_agent
 
 from core.memory import Memory
 
 from utils.host_tools import create_ask_host_tool
+from utils.tool_router import augment_prompt_with_routing
+
+def extract_sources_from_researcher_output(text: str) -> list[str]:
+    """Parses researcher output to extract source URLs."""
+    sources = []
+    # Look for SOURCES: section
+    sources_match = re.search(r'SOURCES:\s*([\s\S]*?)(?:$|(?=\n\n))', text, re.IGNORECASE)
+    if sources_match:
+        sources_section = sources_match.group(1)
+        # Extract URLs from the section
+        urls = re.findall(r'https?://[^\s\)\]]+', sources_section)
+        sources.extend(urls)
+    
+    # Also look for inline URLs throughout the text
+    inline_urls = re.findall(r'https?://[^\s\)\]]+', text)
+    for url in inline_urls:
+        if url not in sources:
+            sources.append(url)
+    
+    return sources if sources else ["internal://research-notes"]
 
 class Orchestrator:
     def __init__(self, ctx=None):
@@ -66,14 +85,16 @@ class Orchestrator:
                 sys.stderr.write("[Orchestrator] Failed to generate a valid plan. Falling back to single query.\n")
                 sub_questions = [topic]
 
-            # 2. RESEARCH (Parallel for Cycle 3)
-            sys.stderr.write("[Orchestrator] Phase 2: Researching (Parallel)...\n")
+            # 2. RESEARCH (Parallel with Deep Dive for thin answers)
+            sys.stderr.write("[Orchestrator] Phase 2: Researching (Parallel with Deep Dive)...\n")
             
-            # Define a helper for parallel execution
-            async def research_task(index, question):
-                print(f"[Orchestrator] Starting research on sub-topic {index+1}: {question}")
-            async def research_task(index, question):
-                sys.stderr.write(f"[Orchestrator] Starting research on sub-topic {index+1}: {question}\n")
+            # Configuration for Deep Dive
+            MIN_CHARS_THRESHOLD = 200  # Answers below this trigger a deep dive
+            MAX_DEEP_DIVE_DEPTH = 1    # Maximum recursion depth
+            
+            # Define a helper for parallel execution with deep dive
+            async def research_task(index, question, depth=0):
+                sys.stderr.write(f"[Orchestrator] Research sub-topic {index+1} (depth {depth}): {question}\n")
                 
                 # Create a researcher agent with access to the host tool if context is available
                 extra_tools = []
@@ -82,9 +103,31 @@ class Orchestrator:
                 
                 agent = get_researcher_agent(extra_tools=extra_tools)
                 
-                note = await self._execute_agent(agent, question, f"researcher_app_{index}")
-                self.memory.add(note, metadata={"topic": question})
-                sys.stderr.write(f"[Orchestrator] Finished sub-topic {index+1}. Stored {len(note)} chars.\n")
+                # IMPROVEMENT C: Augment question with domain-specific routing hints
+                augmented_question = augment_prompt_with_routing(question)
+                
+                note = await self._execute_agent(agent, augmented_question, f"researcher_app_{index}_d{depth}")
+                
+                # Deep Dive: Check if answer is "thin"
+                if len(note) < MIN_CHARS_THRESHOLD and depth < MAX_DEEP_DIVE_DEPTH:
+                    sys.stderr.write(f"[Orchestrator] DEEP DIVE triggered for '{question}' (only {len(note)} chars)\n")
+                    
+                    # Generate a more specific follow-up question
+                    follow_up = f"Provide MORE DETAILED information about: {question}. Include specific facts, data, and statistics."
+                    deep_note = await self._execute_agent(agent, follow_up, f"researcher_app_{index}_deep")
+                    note = f"{note}\n\n[DEEP DIVE EXPANSION]\n{deep_note}"
+                
+                # Extract sources from the researcher's output
+                sources = extract_sources_from_researcher_output(note)
+                primary_source = sources[0] if sources else "internal://research-notes"
+                
+                # Store with source URL tracking
+                self.memory.add(
+                    text=note,
+                    source_url=primary_source,
+                    topic=question
+                )
+                sys.stderr.write(f"[Orchestrator] Finished sub-topic {index+1}. Stored {len(note)} chars. Source: {primary_source}\n")
                 return f"### Sub-topic: {question}\n{note}"
 
             # Execute all tasks concurrently
@@ -94,8 +137,14 @@ class Orchestrator:
 
             # 3. WRITE
             sys.stderr.write("[Orchestrator] Phase 3: Writing...\n")
-            relevant_context = self.memory.query(topic, n_results=10)
-            full_context = f"Original Topic: {topic}\n\nResearch Notes (from Memory):\n" + "\n\n".join(relevant_context)
+            memory_chunks = self.memory.query(topic, n_results=10)
+            
+            # Build context with explicit source citations
+            context_parts = [f"Original Topic: {topic}\n\nResearch Notes (with Sources):"]
+            for chunk in memory_chunks:
+                context_parts.append(f"\n---\nTopic: {chunk.topic}\nSource URL: {chunk.source_url}\nContent:\n{chunk.text}")
+            
+            full_context = "\n".join(context_parts)
             
             draft_report = await self._execute_agent(writer_agent, full_context, "writer_app")
             
@@ -129,3 +178,4 @@ class Orchestrator:
             return final_report
         finally:
             self.memory.clear() # Wipe memory after run
+
