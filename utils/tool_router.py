@@ -11,10 +11,18 @@ from typing import Optional
 # Domain patterns and their recommended data sources
 DOMAIN_PATTERNS = [
     {
+        "name": "technical_analysis",
+        "patterns": [r"RSI", r"MACD", r"moving average", r"support", r"resistance", r"bollinger", r"technical indicator", r"overbought", r"oversold"],
+        "sources": ["yfinance (local)", "TradingView"],
+        "hint": "For technical analysis, use the get_financial_data tool with data_type='technical' to get RSI, MACD, and Moving Averages.",
+        "tool": "get_financial_data"
+    },
+    {
         "name": "finance",
-        "patterns": [r"stock", r"market", r"invest", r"portfolio", r"dividend", r"earnings", r"valuation"],
+        "patterns": [r"stock", r"market", r"invest", r"portfolio", r"dividend", r"earnings", r"valuation", r"P/E", r"price target"],
         "sources": ["Yahoo Finance (via yfinance)", "SEC EDGAR", "Federal Reserve (FRED)"],
-        "hint": "For financial data, ask the host to query Yahoo Finance or check SEC filings."
+        "hint": "For financial data, use the get_financial_data tool to get fundamentals, quotes, or ask the host for SEC filings.",
+        "tool": "get_financial_data"
     },
     {
         "name": "science",

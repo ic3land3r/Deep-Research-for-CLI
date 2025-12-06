@@ -12,7 +12,8 @@ from agents.reviewer import reviewer_agent
 from core.memory import Memory
 
 from utils.host_tools import create_ask_host_tool
-from utils.tool_router import augment_prompt_with_routing
+from utils.tool_router import augment_prompt_with_routing, detect_domain
+from utils.finance_tools import create_finance_tool
 
 def extract_sources_from_researcher_output(text: str) -> list[str]:
     """Parses researcher output to extract source URLs."""
@@ -128,6 +129,12 @@ class Orchestrator:
                 extra_tools = []
                 if self.ctx:
                     extra_tools.append(create_ask_host_tool(self.ctx))
+                
+                # CONDITIONAL TOOL INJECTION: Add finance tool if domain matches
+                domain_info = detect_domain(question)
+                if domain_info and domain_info.get("domain") in ("technical_analysis", "finance"):
+                    sys.stderr.write(f"[Orchestrator] DOMAIN DETECTED: {domain_info['domain']} - injecting finance tool\n")
+                    extra_tools.append(create_finance_tool())
                 
                 agent = get_researcher_agent(extra_tools=extra_tools)
                 
