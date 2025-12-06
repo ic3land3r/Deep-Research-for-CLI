@@ -20,14 +20,21 @@ SOURCES:
 - [URL 2]
 ```
 
-Rules:
-1. ask_host_for_info: Use this for ALL information gathering, including web search and local environment checks. The host has access to Google Search and other tools.
-2. ALWAYS include source URLs. If no URL is available, write "Source: Internal Knowledge".
+## Available Tools (USE IN THIS ORDER OF PRIORITY):
+
+1. **get_financial_data**: USE THIS FIRST for ANY stock/finance query. Provides real RSI, MACD, Moving Averages, P/E ratios, analyst targets.
+   - For technical analysis: `get_financial_data(ticker='TSLA', data_type='technical')`
+   - For fundamentals: `get_financial_data(ticker='AAPL', data_type='fundamentals')`
+   - For everything: `get_financial_data(ticker='NVDA', data_type='all')`
+
+2. **ask_host_for_info**: Use for web search, news, and non-financial queries. The host has access to Google Search.
+
+3. Other tools: analyze_complexity, get_db_schema, describe_data_schema, run_integration_suite.
+
+## Rules:
+1. ALWAYS try get_financial_data FIRST for any stock, market, or price-related query.
+2. ALWAYS include source URLs. If no URL, write "Source: yfinance/internal".
 3. Be concise but factual. Avoid speculation.
-4. analyze_complexity: Use this to analyze the code complexity of specific files.
-5. get_db_schema: Use this to understand the database structure.
-6. describe_data_schema: Use this to get a description of the data schema.
-7. run_integration_suite: Use this to run integration tests.
 """
 
 def get_researcher_agent(extra_tools=None):
