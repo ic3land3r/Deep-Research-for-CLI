@@ -192,36 +192,32 @@ class Orchestrator:
             
             draft_report = await self._execute_agent(writer_agent, full_context, "writer_app")
             
-            # 4. REVIEW (Feedback Loop) - SKIPPED in quick mode
-            if self.mode == "quick":
-                sys.stderr.write("[Orchestrator] QUICK MODE: Skipping review phase\n")
-                final_report = draft_report
-            else:
-                sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
+            # 4. REVIEW (Feedback Loop) - runs for ALL modes
+            sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
+            
+            review_prompt = f"""
+            Review the following report for accuracy and completeness based on the topic '{topic}'.
+            Report:
+            {draft_report}
+            """
+            review_result = await self._execute_agent(reviewer_agent, review_prompt, "reviewer_app")
+            
+            if "FAIL" in review_result:
+                sys.stderr.write("[Orchestrator] Review failed. Revising...\n")
+                sys.stderr.write(f"[Orchestrator] Feedback: {review_result}\n")
                 
-                review_prompt = f"""
-                Review the following report for accuracy and completeness based on the topic '{topic}'.
-                Report:
-                {draft_report}
+                revision_prompt = f"""
+                The previous draft was rejected.
+                Feedback: {review_result}
+                
+                Please rewrite the report to address this feedback.
+                Original Context:
+                {full_context}
                 """
-                review_result = await self._execute_agent(reviewer_agent, review_prompt, "reviewer_app")
-                
-                if "FAIL" in review_result:
-                    sys.stderr.write("[Orchestrator] Review failed. Revising...\n")
-                    sys.stderr.write(f"[Orchestrator] Feedback: {review_result}\n")
-                    
-                    revision_prompt = f"""
-                    The previous draft was rejected.
-                    Feedback: {review_result}
-                    
-                    Please rewrite the report to address this feedback.
-                    Original Context:
-                    {full_context}
-                    """
-                    final_report = await self._execute_agent(writer_agent, revision_prompt, "writer_app_revision")
-                else:
-                    sys.stderr.write("[Orchestrator] Review passed.\n")
-                    final_report = draft_report
+                final_report = await self._execute_agent(writer_agent, revision_prompt, "writer_app_revision")
+            else:
+                sys.stderr.write("[Orchestrator] Review passed.\n")
+                final_report = draft_report
             
             return final_report
         finally:
