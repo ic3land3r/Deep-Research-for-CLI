@@ -216,3 +216,193 @@ Once configured, restart your Gemini CLI.
 **"LlmAgent object has no attribute run"**:
 *   This error occurs if you try to use the synchronous `.run()` method on an ADK agent.
 *   **Fix**: The code has been updated to use `Runner` and `run_async`. Ensure you have the latest version of `agent.py`.
+
+---
+
+## 🎯 Research Modes
+
+The Deep Research agent supports three distinct research modes, each optimized for different use cases:
+
+| Mode | Planning | Deep Dive | Review | Best For |
+|:-----|:---------|:----------|:-------|:---------|
+| **`quick`** | ❌ Skip | ❌ Never | ✅ Yes | Fast lookups, simple facts |
+| **`standard`** | ✅ Yes | 🔄 Conditional | ✅ Yes | Balanced research (default) |
+| **`deep`** | ✅ Yes | ✅ Always | ✅ Yes | Exhaustive analysis |
+
+### Usage
+
+```python
+# MCP Tool Call
+perform_deep_research(topic="Your topic", mode="deep")
+```
+
+### Mode Behavior Details
+
+```mermaid
+flowchart TD
+    A[User Query] --> B{Mode?}
+    
+    B -->|quick| C[Skip Planning]
+    B -->|standard| D[Generate Plan]
+    B -->|deep| E[Generate Plan]
+    
+    C --> F[Research Phase]
+    D --> F
+    E --> F
+    
+    F --> G{Check Answer Quality}
+    
+    G -->|quick| H[Never Deep Dive]
+    G -->|standard| I{Thin Answer?}
+    G -->|deep| J[Always Deep Dive]
+    
+    I -->|chars < 300 OR facts < 3| J
+    I -->|sufficient| H
+    
+    H --> K[Review Phase]
+    J --> L[Recursive Research] --> K
+    
+    K --> M[Final Report]
+```
+
+### Deep Dive Trigger (Hybrid Metric)
+
+In `standard` mode, a **deep dive** is triggered when an answer is "thin":
+- Character count < 300, **OR**
+- Fact count < 3 (bullets, statistics, URLs)
+
+---
+
+## 🔧 Conditional Tool Injection
+
+The agent uses a **Tool Router** to dynamically inject specialized data tools based on query domain.
+
+### Domain Detection Flow
+
+```mermaid
+flowchart LR
+    Q[Query] --> TR[Tool Router]
+    TR --> DD{Domain Detection}
+    
+    DD -->|RSI, MACD, MA| FT[Finance Tool]
+    DD -->|research paper, study| AT[Academic Tools]
+    DD -->|GDP, inflation, policy| MT[Macro Tools]
+    DD -->|latest, 2025, breaking| NT[News Tools]
+    DD -->|no match| HT[Host Tool Only]
+    
+    FT --> R[Researcher Agent]
+    AT --> R
+    MT --> R
+    NT --> R
+    HT --> R
+```
+
+### Available Tools by Domain
+
+| Domain Pattern | Injected Tool(s) | Data Source |
+|:---------------|:-----------------|:------------|
+| `RSI`, `MACD`, `moving average` | `get_financial_data` | yfinance (no auth) |
+| `stock`, `P/E`, `earnings` | `get_financial_data` | yfinance (no auth) |
+| `research paper`, `peer review` | `search_arxiv`, `search_openalex` | arXiv, OpenAlex (no auth) |
+| `regulation`, `policy`, `federal` | `get_world_bank_data`, `get_news_feed` | World Bank, RSS (no auth) |
+| `today`, `latest`, `2025` | `get_world_bank_data`, `get_news_feed` | World Bank, RSS (no auth) |
+
+---
+
+## 📊 Data Source Integrations
+
+All data sources are **permissionless** (no API keys required).
+
+### Finance Tools (`utils/finance_tools.py`)
+
+| Tool | Features | Source |
+|:-----|:---------|:-------|
+| `get_financial_data` | RSI, MACD, MAs, P/E, analyst targets | yfinance |
+
+**Example Output:**
+```
+## Technical Indicators
+- **RSI (14):** 77.0 (overbought)
+- **MACD:** 3.693 (bullish)
+- **50-Day MA:** $435.22 (above)
+```
+
+### Academic Tools (`utils/academic_tools.py`)
+
+| Tool | Features | Source |
+|:-----|:---------|:-------|
+| `search_arxiv` | Paper search, abstracts, PDF links | arXiv API |
+| `search_openalex` | 240M+ works, citation counts, DOIs | OpenAlex |
+
+### Macro/News Tools (`utils/macro_news_tools.py`)
+
+| Tool | Features | Source |
+|:-----|:---------|:-------|
+| `get_world_bank_data` | GDP, inflation, unemployment by country | World Bank Open Data |
+| `get_news_feed` | Headlines from Reuters, BBC, CNBC, Google News | RSS feeds |
+
+---
+
+## 🏗️ Complete Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "User Layer"
+        U[User] --> CLI[Gemini CLI / Antigravity]
+    end
+    
+    subgraph "MCP Layer"
+        CLI -->|MCP| Server[Deep Research Server]
+        Server -->|perform_deep_research| Orch[Orchestrator]
+    end
+    
+    subgraph "Agent Layer"
+        Orch --> Plan[Planner Agent]
+        Orch --> Res[Researcher Agent]
+        Orch --> Write[Writer Agent]
+        Orch --> Rev[Reviewer Agent]
+    end
+    
+    subgraph "Tool Layer"
+        Res --> TR[Tool Router]
+        TR -->|Domain: finance| FT[get_financial_data]
+        TR -->|Domain: science| AT[search_arxiv / search_openalex]
+        TR -->|Domain: macro| MT[get_world_bank_data / get_news_feed]
+        TR -->|Default| HT[ask_host_for_info]
+    end
+    
+    subgraph "Data Sources (No Auth)"
+        FT --> YF[yfinance]
+        AT --> ARX[arXiv API]
+        AT --> OA[OpenAlex API]
+        MT --> WB[World Bank API]
+        MT --> RSS[RSS Feeds]
+        HT -->|Sampling| CLI
+    end
+    
+    subgraph "Memory"
+        Res --> Mem[(ChromaDB)]
+        Write --> Mem
+    end
+```
+
+---
+
+## 📝 Changelog
+
+### v0.3.0 (2024-12)
+- **Research Modes**: Added `quick`, `standard`, `deep` modes
+- **Finance Tools**: Real-time RSI, MACD, Moving Averages via yfinance
+- **Academic Tools**: arXiv and OpenAlex paper search
+- **Macro/News Tools**: World Bank data and RSS news feeds
+- **Deep Dive Mode**: Hybrid fact density metric for thin answer detection
+- **Tool Router**: Conditional tool injection based on query domain
+
+### v0.2.0 (2024-12)
+- Source fidelity improvements (URL tracking)
+- Reviewer feedback loop
+- Host query sampling mechanism
+
+### v0.1.0 (2024-11)
+- Initial release with Planner, Researcher, Writer, Reviewer pipeline
+
