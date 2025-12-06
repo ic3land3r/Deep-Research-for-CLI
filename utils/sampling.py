@@ -46,24 +46,36 @@ async def safe_sampling_request(
 
     try:
         # Send the request to the client (host)
-        # Note: fastmcp Context.session.send_request is the low-level way to do this
-        # We assume ctx.session is available and supports send_request
         result = await ctx.session.send_request("sampling/createMessage", params)
         
-        # Parse the result
-        # The expected format is: { "model": "...", "role": "assistant", "content": { "type": "text", "text": "..." } }
-        # Or sometimes content is a list of objects.
+        # Handle pydantic models vs dicts
+        if hasattr(result, 'model_dump'):
+            result = result.model_dump()
+        elif hasattr(result, '__dict__'):
+            result = vars(result)
         
-        content = result.get("content")
+        # Parse the result
+        content = result.get("content") if isinstance(result, dict) else None
+        
+        if content is None:
+            # Try direct text extraction
+            if isinstance(result, str):
+                return result
+            return str(result)
         
         if isinstance(content, dict) and content.get("type") == "text":
-             return content.get("text")
+             return content.get("text", "")
         elif isinstance(content, list):
              # Join all text parts
-             return "".join([part.get("text", "") for part in content if part.get("type") == "text"])
+             return "".join([part.get("text", "") for part in content if isinstance(part, dict) and part.get("type") == "text"])
+        elif isinstance(content, str):
+             return content
         else:
              return str(content)
 
     except Exception as e:
+        import sys
+        sys.stderr.write(f"[Sampling Error] {str(e)}\n")
         # Handle cases where the user denies the request or the host doesn't support sampling
         return f"Error during sampling: {str(e)}"
+
