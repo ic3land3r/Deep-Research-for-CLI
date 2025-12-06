@@ -34,10 +34,11 @@ def extract_sources_from_researcher_output(text: str) -> list[str]:
     return sources if sources else ["internal://research-notes"]
 
 class Orchestrator:
-    def __init__(self, ctx=None):
+    def __init__(self, ctx=None, mode: str = "standard"):
         self.session_service = InMemorySessionService()
         self.memory = Memory()
         self.ctx = ctx
+        self.mode = mode  # "quick", "standard", or "deep"
 
     async def _execute_agent(self, agent, prompt: str, app_name: str) -> str:
         """Helper to execute a single agent run."""
@@ -66,27 +67,38 @@ class Orchestrator:
 
     async def run(self, topic: str) -> str:
         """
-        Executes the Deep Research workflow: Plan -> Research -> Write -> Review.
+        Executes the Deep Research workflow with mode-specific behavior.
+        
+        Modes:
+        - quick: Skip planning, single research pass, no deep dive, no review
+        - standard: Plan -> Research (conditional deep dive) -> Write -> Review
+        - deep: Plan -> Research (forced deep dive) -> Write -> Review
         """
         import sys
-        sys.stderr.write(f"[Orchestrator] Starting research on: {topic}\n")
+        sys.stderr.write(f"[Orchestrator] Starting research on: {topic} (mode={self.mode})\n")
         self.memory.clear() # Ensure fresh memory for this run
 
         try:
-            # 1. PLAN
-            sys.stderr.write("[Orchestrator] Phase 1: Planning...\n")
-            plan_text = await self._execute_agent(planner_agent, topic, "planner_app")
-            
-            # Parse the plan (simple line splitting for Cycle 1)
-            sub_questions = [line.strip().replace("- ", "") for line in plan_text.split("\n") if line.strip().startswith("-")]
-            sys.stderr.write(f"[Orchestrator] Generated Plan: {sub_questions}\n")
-
-            if not sub_questions:
-                sys.stderr.write("[Orchestrator] Failed to generate a valid plan. Falling back to single query.\n")
+            # MODE: quick - skip planning, treat topic as single query
+            if self.mode == "quick":
+                sys.stderr.write("[Orchestrator] QUICK MODE: Skipping planning phase\n")
                 sub_questions = [topic]
+            else:
+                # 1. PLAN (standard and deep modes)
+                sys.stderr.write("[Orchestrator] Phase 1: Planning...\n")
+                plan_text = await self._execute_agent(planner_agent, topic, "planner_app")
+                
+                # Parse the plan (simple line splitting for Cycle 1)
+                sub_questions = [line.strip().replace("- ", "") for line in plan_text.split("\n") if line.strip().startswith("-")]
+                sys.stderr.write(f"[Orchestrator] Generated Plan: {sub_questions}\n")
+
+                if not sub_questions:
+                    sys.stderr.write("[Orchestrator] Failed to generate a valid plan. Falling back to single query.\n")
+                    sub_questions = [topic]
 
             # 2. RESEARCH (Parallel with Deep Dive for thin answers)
             sys.stderr.write("[Orchestrator] Phase 2: Researching (Parallel with Deep Dive)...\n")
+
             
             # Configuration for Deep Dive (HYBRID: char count + fact density)
             MIN_CHARS_THRESHOLD = 300  # Raised threshold
@@ -124,11 +136,26 @@ class Orchestrator:
                 
                 note = await self._execute_agent(agent, augmented_question, f"researcher_app_{index}_d{depth}")
                 
-                # Deep Dive: Check if answer is "thin" using HYBRID metric
-                thin, chars, facts = is_thin_answer(note)
-                if thin and depth < MAX_DEEP_DIVE_DEPTH:
-                    sys.stderr.write(f"[Orchestrator] DEEP DIVE triggered for '{question}' (chars={chars}, facts={facts})\n")
-                    
+                # Deep Dive: MODE-AWARE behavior
+                # - quick: NEVER deep dive
+                # - standard: Conditional (hybrid metric)
+                # - deep: ALWAYS deep dive
+                should_deep_dive = False
+                
+                if self.mode == "deep":
+                    # Force deep dive in deep mode
+                    should_deep_dive = depth < MAX_DEEP_DIVE_DEPTH
+                    if should_deep_dive:
+                        sys.stderr.write(f"[Orchestrator] DEEP MODE: Forcing deep dive for '{question}'\n")
+                elif self.mode == "standard":
+                    # Use hybrid metric
+                    thin, chars, facts = is_thin_answer(note)
+                    should_deep_dive = thin and depth < MAX_DEEP_DIVE_DEPTH
+                    if should_deep_dive:
+                        sys.stderr.write(f"[Orchestrator] DEEP DIVE triggered for '{question}' (chars={chars}, facts={facts})\n")
+                # quick mode: should_deep_dive stays False
+                
+                if should_deep_dive:
                     # Generate a more specific follow-up question
                     follow_up = f"Provide MORE DETAILED information about: {question}. Include specific facts, data, and statistics."
                     deep_note = await self._execute_agent(agent, follow_up, f"researcher_app_{index}_deep")
@@ -165,32 +192,36 @@ class Orchestrator:
             
             draft_report = await self._execute_agent(writer_agent, full_context, "writer_app")
             
-            # 4. REVIEW (Feedback Loop)
-            sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
-            
-            review_prompt = f"""
-            Review the following report for accuracy and completeness based on the topic '{topic}'.
-            Report:
-            {draft_report}
-            """
-            review_result = await self._execute_agent(reviewer_agent, review_prompt, "reviewer_app")
-            
-            if "FAIL" in review_result:
-                sys.stderr.write("[Orchestrator] Review failed. Revising...\n")
-                sys.stderr.write(f"[Orchestrator] Feedback: {review_result}\n")
-                
-                revision_prompt = f"""
-                The previous draft was rejected.
-                Feedback: {review_result}
-                
-                Please rewrite the report to address this feedback.
-                Original Context:
-                {full_context}
-                """
-                final_report = await self._execute_agent(writer_agent, revision_prompt, "writer_app_revision")
-            else:
-                sys.stderr.write("[Orchestrator] Review passed.\n")
+            # 4. REVIEW (Feedback Loop) - SKIPPED in quick mode
+            if self.mode == "quick":
+                sys.stderr.write("[Orchestrator] QUICK MODE: Skipping review phase\n")
                 final_report = draft_report
+            else:
+                sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
+                
+                review_prompt = f"""
+                Review the following report for accuracy and completeness based on the topic '{topic}'.
+                Report:
+                {draft_report}
+                """
+                review_result = await self._execute_agent(reviewer_agent, review_prompt, "reviewer_app")
+                
+                if "FAIL" in review_result:
+                    sys.stderr.write("[Orchestrator] Review failed. Revising...\n")
+                    sys.stderr.write(f"[Orchestrator] Feedback: {review_result}\n")
+                    
+                    revision_prompt = f"""
+                    The previous draft was rejected.
+                    Feedback: {review_result}
+                    
+                    Please rewrite the report to address this feedback.
+                    Original Context:
+                    {full_context}
+                    """
+                    final_report = await self._execute_agent(writer_agent, revision_prompt, "writer_app_revision")
+                else:
+                    sys.stderr.write("[Orchestrator] Review passed.\n")
+                    final_report = draft_report
             
             return final_report
         finally:

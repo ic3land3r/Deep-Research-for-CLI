@@ -6,16 +6,22 @@ from utils.sampling import safe_sampling_request
 mcp = FastMCP("Deep Research")
 
 @mcp.tool()
-async def perform_deep_research(ctx: Context, topic: str) -> str:
+async def perform_deep_research(ctx: Context, topic: str, mode: str = "standard") -> str:
     """
     Performs a deep, multi-step research on a given topic using Gemini 3.0 Pro.
     
     Args:
         ctx: The FastMCP context.
         topic: The research topic or question.
+        mode: Research mode - "quick" (fast, grounded search), "standard" (balanced), or "deep" (thorough, forced deep dive).
     """
+    # Validate mode
+    valid_modes = ["quick", "standard", "deep"]
+    if mode not in valid_modes:
+        return f"Invalid mode '{mode}'. Must be one of: {valid_modes}"
+    
     try:
-        orchestrator = Orchestrator(ctx=ctx)
+        orchestrator = Orchestrator(ctx=ctx, mode=mode)
         result = await orchestrator.run(topic)
         return result
     except Exception as e:
