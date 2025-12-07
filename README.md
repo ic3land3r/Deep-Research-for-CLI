@@ -390,6 +390,21 @@ graph TB
 
 ## 📝 Changelog
 
+### v0.4.0 (2025-12)
+**Phase 1: Robustness**
+- Robust plan parsing with JSON primary + regex fallback
+- Graceful async failure handling (`return_exceptions=True`)
+- Retry logic with exponential backoff (3 attempts, 1s→2s→4s)
+- Specific exception handling for network, parsing, and unexpected errors
+
+**Phase 2: Performance**
+- Session-scoped memory via `session_id` metadata (no collection recreation)
+- Shared ChromaDB client across Memory instances
+
+**Phase 3: Structured Output**
+- `ResearchPlan` Pydantic schema for Planner agent (`output_schema`)
+- Guaranteed JSON output from Planner, eliminating parsing failures
+
 ### v0.3.0 (2024-12)
 - **Research Modes**: Added `quick`, `standard`, `deep` modes
 - **Finance Tools**: Real-time RSI, MACD, Moving Averages via yfinance
