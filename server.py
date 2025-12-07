@@ -1,6 +1,8 @@
 from fastmcp import FastMCP, Context
 from core.orchestrator import Orchestrator
 from utils.sampling import safe_sampling_request
+import sys
+import asyncio
 
 # Initialize FastMCP server
 mcp = FastMCP("Deep Research")
@@ -24,8 +26,15 @@ async def perform_deep_research(ctx: Context, topic: str, mode: str = "standard"
         orchestrator = Orchestrator(ctx=ctx, mode=mode)
         result = await orchestrator.run(topic)
         return result
+    except (ConnectionError, TimeoutError, asyncio.TimeoutError) as e:
+        sys.stderr.write(f"[Deep Research] Network error: {type(e).__name__}: {e}\n")
+        return f"Research failed due to network error: {type(e).__name__}. Please retry."
+    except ValueError as e:
+        sys.stderr.write(f"[Deep Research] Parsing/validation error: {e}\n")
+        return f"Research failed due to parsing error: {str(e)}"
     except Exception as e:
-        return f"Research failed due to error: {str(e)}"
+        sys.stderr.write(f"[Deep Research] Unexpected error: {type(e).__name__}: {e}\n")
+        return f"Research failed: {type(e).__name__}: {str(e)}"
 
 @mcp.tool()
 async def analyze_complexity(ctx: Context, file_path: str) -> str:

@@ -91,9 +91,23 @@ class Orchestrator:
                 sys.stderr.write("[Orchestrator] Phase 1: Planning...\n")
                 plan_text = await self._execute_agent(planner_agent, topic, "planner_app")
                 
-                # Parse the plan (simple line splitting for Cycle 1)
-                sub_questions = [line.strip().replace("- ", "") for line in plan_text.split("\n") if line.strip().startswith("-")]
-                sys.stderr.write(f"[Orchestrator] Generated Plan: {sub_questions}\n")
+                # Parse structured JSON output from Planner (with regex fallback)
+                sub_questions = []
+                try:
+                    import json
+                    plan_data = json.loads(plan_text)
+                    if isinstance(plan_data, dict) and "sub_questions" in plan_data:
+                        sub_questions = plan_data["sub_questions"]
+                        sys.stderr.write(f"[Orchestrator] Parsed JSON plan: {sub_questions}\n")
+                except (json.JSONDecodeError, TypeError):
+                    # Fallback to regex parsing for non-JSON output
+                    sys.stderr.write("[Orchestrator] JSON parse failed, falling back to regex\n")
+                    for line in plan_text.split("\n"):
+                        line = line.strip()
+                        match = re.match(r'^(?:[-*]|\d+\.)\s+(.+)$', line)
+                        if match:
+                            sub_questions.append(match.group(1).strip())
+                    sys.stderr.write(f"[Orchestrator] Regex parsed plan: {sub_questions}\n")
 
                 if not sub_questions:
                     sys.stderr.write("[Orchestrator] Failed to generate a valid plan. Falling back to single query.\n")
@@ -195,10 +209,16 @@ class Orchestrator:
                 sys.stderr.write(f"[Orchestrator] Finished sub-topic {index+1}. Stored {len(note)} chars. Source: {primary_source}\n")
                 return f"### Sub-topic: {question}\n{note}"
 
-            # Execute all tasks concurrently
-            await asyncio.gather(*[
-                research_task(i, q) for i, q in enumerate(sub_questions)
-            ])
+            # Execute all tasks concurrently with graceful failure handling
+            results = await asyncio.gather(
+                *[research_task(i, q) for i, q in enumerate(sub_questions)],
+                return_exceptions=True
+            )
+            
+            # Log any failures but continue with partial results
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    sys.stderr.write(f"[Orchestrator] Research task {i+1} failed: {result}\n")
 
             # 3. WRITE
             sys.stderr.write("[Orchestrator] Phase 3: Writing...\n")
