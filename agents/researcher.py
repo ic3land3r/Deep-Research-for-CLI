@@ -1,3 +1,18 @@
+"""
+Researcher Agent - The Worker
+
+Role: Gathers facts for a specific sub-question using available tools.
+Input: A specific sub-question (string).
+Output: Structured findings with FINDINGS and SOURCES sections.
+
+Tools (priority order):
+1. get_financial_data - For stock/finance queries (yfinance)
+2. ask_host_for_info - Delegates to Host for web search (google_search is incompatible)
+3. analyze_complexity, get_db_schema, etc. - Specialized tools
+
+Note: GoogleSearchTool is removed due to Function Calling incompatibility.
+We rely on ask_host_for_info for search capabilities.
+"""
 from google.adk.agents import LlmAgent
 from google.adk.tools import google_search
 

@@ -1,3 +1,13 @@
+"""
+Reviewer Agent - The Critic
+
+Role: Verifies that claims in the draft report are supported by source text.
+Input: Draft report with claims to verify.
+Output: PASS or FAIL status with reasoning and corrections if needed.
+
+If the review fails, the Writer is invoked again with specific feedback.
+This implements a self-correction feedback loop (one revision attempt).
+"""
 from google.adk.agents import LlmAgent
 
 REVIEWER_PROMPT = """

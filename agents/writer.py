@@ -1,3 +1,13 @@
+"""
+Writer Agent - The Synthesizer
+
+Role: Aggregates research findings into a comprehensive Markdown report.
+Input: Research context with findings and source URLs.
+Output: Structured report with Executive Summary, Key Findings, Analysis, and Sources.
+
+Uses Chain of Density prompting to maximize information value.
+CRITICAL: Sources section must contain REAL URLs from research notes.
+"""
 from google.adk.agents import LlmAgent
 
 WRITER_PROMPT = """

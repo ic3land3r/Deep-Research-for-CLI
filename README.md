@@ -12,7 +12,7 @@ The system implements a **Level 3 Autonomous Agent** architecture, featuring hie
 | :--- | :--- | :--- |
 | **Orchestrator** | **The Controller** | Manages the lifecycle of the research request. It initializes the session, coordinates agent execution, manages the Vector DB, and enforces the feedback loop. |
 | **Planner Agent** | **The Strategist** | Decomposes complex user queries into a Directed Acyclic Graph (DAG) of sub-questions. Uses `gemini-3-pro-preview` for reasoning. |
-| **Researcher Agent** | **The Worker** | Executed in **PARALLEL** for each sub-question. It uses the `google_search` tool to gather facts and summarizes them into concise notes. |
+| **Researcher Agent** | **The Worker** | Executed in **PARALLEL** for each sub-question. Delegates search to the Host via `ask_host_for_info` (since `google_search` is incompatible with Function Calling). |
 | **Memory Layer** | **The Context** | A **Session-Scoped Vector Database** (ChromaDB) that stores research notes. It allows the Writer to retrieve semantically relevant information based on the topic. |
 | **Writer Agent** | **The Synthesizer** | Aggregates retrieved context and generates a comprehensive report using **Chain of Density** prompting to maximize information value. |
 | **Reviewer Agent** | **The Critic** | Analyzes the draft report for accuracy and completeness. If it rejects the draft ("FAIL"), it triggers a revision cycle. |
@@ -151,6 +151,10 @@ The architecture relies on a bidirectional flow enabled by the Model Context Pro
 ```bash
 git clone https://github.com/ic3land3r/Deep-Research-for-CLI.git
 cd Deep-Research-for-CLI
+
+# For standalone clones (outside ADK monorepo), comment out the workspace dependency:
+# sed -i '/\[tool.uv.sources\]/,/google-adk/d' pyproject.toml
+
 uv sync
 ```
 

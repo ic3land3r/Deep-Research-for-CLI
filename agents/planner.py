@@ -1,3 +1,12 @@
+"""
+Planner Agent - The Strategist
+
+Role: Decomposes complex user queries into a structured research plan.
+Input: A complex topic or question (string).
+Output: A ResearchPlan object with sub_questions (list of 3-5 search-friendly questions).
+
+This agent uses structured output (output_schema) to guarantee valid JSON responses.
+"""
 from google.adk.agents import LlmAgent
 from google.genai import types
 from pydantic import BaseModel, Field

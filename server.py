@@ -43,10 +43,23 @@ async def analyze_complexity(ctx: Context, file_path: str) -> str:
     
     Args:
         ctx: The FastMCP context.
-        file_path: The path to the file to analyze.
+        file_path: The path to the file to analyze (must be within current working directory).
     """
+    import os
+    
     try:
-        with open(file_path, "r") as f:
+        # Security: Validate file path is within CWD to prevent arbitrary file read
+        cwd = os.getcwd()
+        abs_path = os.path.abspath(os.path.expanduser(file_path))
+        
+        # Ensure the resolved path starts with CWD (prevents path traversal)
+        if not abs_path.startswith(cwd + os.sep) and abs_path != cwd:
+            return f"Access denied: File must be within the project directory ({cwd})"
+        
+        if not os.path.isfile(abs_path):
+            return f"Error: '{file_path}' is not a valid file"
+        
+        with open(abs_path, "r") as f:
             content = f.read()
             
         prompt = f"Analyze the code complexity of the following file. Identify any complex functions or logic that might be hard to maintain:\n\n{content}"
