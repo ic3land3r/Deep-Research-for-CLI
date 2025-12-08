@@ -1,5 +1,6 @@
 from fastmcp import Context
-from typing import Optional, Dict, Any
+from mcp.types import SamplingMessage, TextContent as MCPTextContent
+from typing import Optional
 import asyncio
 import sys
 
@@ -29,58 +30,41 @@ async def safe_sampling_request(
     Returns:
         The generated text from the model.
     """
-    
-    # Construct the message payload
+
+    # Construct messages using proper MCP types (not raw dicts or strings)
     messages = [
-        {
-            "role": "user",
-            "content": {
-                "type": "text",
-                "text": prompt
-            }
-        }
+        SamplingMessage(
+            role="user",
+            content=MCPTextContent(type="text", text=prompt)
+        )
     ]
-    
-    # Build the sampling parameters
-    params = {
-        "messages": messages,
-        "maxTokens": max_tokens,
-        "includeContext": include_context
-    }
-    
-    if system_prompt:
-        params["systemPrompt"] = system_prompt
 
     last_error = None
     for attempt in range(retries):
         try:
-            # Send the request to the client (host)
-            result = await ctx.session.send_request("sampling/createMessage", params)
+            # Use session.create_message for sampling
+            result = await ctx.session.create_message(
+                messages=messages,
+                max_tokens=max_tokens,
+                system_prompt=system_prompt
+            )
             
-            # Handle pydantic models vs dicts
-            if hasattr(result, 'model_dump'):
-                result = result.model_dump()
-            elif hasattr(result, '__dict__'):
-                result = vars(result)
+            # result.content is a LIST of content objects - must index into it
+            if hasattr(result, 'content'):
+                content = result.content
+                # Handle list of content objects
+                if isinstance(content, list) and len(content) > 0:
+                    first_content = content[0]
+                    if hasattr(first_content, 'text'):
+                        return first_content.text
+                    return str(first_content)
+                # Handle single content object
+                elif hasattr(content, 'text'):
+                    return content.text
+                else:
+                    return str(content)
             
-            # Parse the result
-            content = result.get("content") if isinstance(result, dict) else None
-            
-            if content is None:
-                # Try direct text extraction
-                if isinstance(result, str):
-                    return result
-                return str(result)
-            
-            if isinstance(content, dict) and content.get("type") == "text":
-                 return content.get("text", "")
-            elif isinstance(content, list):
-                 # Join all text parts
-                 return "".join([part.get("text", "") for part in content if isinstance(part, dict) and part.get("type") == "text"])
-            elif isinstance(content, str):
-                 return content
-            else:
-                 return str(content)
+            return str(result)
 
         except (ConnectionError, TimeoutError, asyncio.TimeoutError) as e:
             # Transient errors - retry with backoff
@@ -96,4 +80,5 @@ async def safe_sampling_request(
     # All retries exhausted
     sys.stderr.write(f"[Sampling] All {retries} attempts failed. Last error: {last_error}\n")
     return f"Error during sampling after {retries} attempts: {str(last_error)}"
+
 
