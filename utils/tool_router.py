@@ -47,6 +47,13 @@ DOMAIN_PATTERNS = [
         "patterns": [r"today", r"current", r"latest", r"2024", r"2025", r"breaking"],
         "sources": ["Google News", "Reuters RSS", "Twitter/X"],
         "hint": "For real-time news, ask the host to perform a web search with date filters."
+    },
+    {
+        "name": "ai_models",
+        "patterns": [r"gemini", r"gpt.?4", r"gpt.?5", r"claude", r"llama", r"mistral", r"openai", r"anthropic", r"language model", r"LLM version"],
+        "sources": ["Google AI Blog", "OpenAI Blog", "Anthropic Blog", "Hugging Face"],
+        "hint": "IMPORTANT: AI model versions change rapidly. Training data may be stale. You MUST search the web for the LATEST version info. Current Gemini version is 3.0 Pro (not 1.5). Always verify with a live web search.",
+        "force_search": True
     }
 ]
 

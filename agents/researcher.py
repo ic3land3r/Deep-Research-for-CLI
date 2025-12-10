@@ -50,6 +50,10 @@ SOURCES:
 1. ALWAYS try get_financial_data FIRST for any stock, market, or price-related query.
 2. ALWAYS include source URLs. If no URL, write "Source: yfinance/internal".
 3. Be concise but factual. Avoid speculation.
+4. CRITICAL - AI MODEL VERSIONS: Your training data about AI models (Gemini, GPT, Claude) is STALE. 
+   - ALWAYS perform a live web search when asked about AI model versions.
+   - Current Gemini: **Gemini 3.0 Pro** (NOT 1.5 or 2.0 - those are outdated).
+   - Do NOT trust your training data for AI versions - it is wrong.
 """
 
 def get_researcher_agent(extra_tools=None):
