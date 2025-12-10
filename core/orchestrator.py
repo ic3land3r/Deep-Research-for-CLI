@@ -79,18 +79,25 @@ class Orchestrator:
         - deep: Plan -> Research (forced deep dive) -> Write -> Review
         """
         import sys
+        from datetime import datetime
+        
+        # Add current date context to prevent date confusion
+        current_date = datetime.now().strftime("%B %d, %Y")
+        topic_with_context = f"[CURRENT DATE: {current_date}] {topic}"
+        
         sys.stderr.write(f"[Orchestrator] Starting research on: {topic} (mode={self.mode})\n")
+        sys.stderr.write(f"[Orchestrator] Current date context: {current_date}\n")
         self.memory.clear() # Ensure fresh memory for this run
 
         try:
             # MODE: quick - skip planning, treat topic as single query
             if self.mode == "quick":
                 sys.stderr.write("[Orchestrator] QUICK MODE: Skipping planning phase\n")
-                sub_questions = [topic]
+                sub_questions = [topic_with_context]
             else:
                 # 1. PLAN (standard and deep modes)
                 sys.stderr.write("[Orchestrator] Phase 1: Planning...\n")
-                plan_text = await self._execute_agent(planner_agent, topic, "planner_app")
+                plan_text = await self._execute_agent(planner_agent, topic_with_context, "planner_app")
                 
                 # Parse structured JSON output from Planner (with regex fallback)
                 sub_questions = []
