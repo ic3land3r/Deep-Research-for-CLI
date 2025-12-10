@@ -6,7 +6,7 @@ from google.genai import types
 
 from agents.planner import planner_agent
 from agents.researcher import get_researcher_agent
-from agents.writer import writer_agent
+from agents.writer import get_writer_agent
 from agents.reviewer import reviewer_agent
 
 from core.memory import Memory
@@ -37,11 +37,12 @@ def extract_sources_from_researcher_output(text: str) -> list[str]:
     return sources if sources else ["internal://research-notes"]
 
 class Orchestrator:
-    def __init__(self, ctx=None, mode: str = "standard"):
+    def __init__(self, ctx=None, mode: str = "standard", output_format: str = "markdown"):
         self.session_service = InMemorySessionService()
         self.memory = Memory()
         self.ctx = ctx
         self.mode = mode  # "quick", "standard", or "deep"
+        self.output_format = output_format  # "markdown", "json", or custom format
 
     async def _execute_agent(self, agent, prompt: str, app_name: str) -> str:
         """Helper to execute a single agent run."""
@@ -231,7 +232,7 @@ class Orchestrator:
             
             full_context = "\n".join(context_parts)
             
-            draft_report = await self._execute_agent(writer_agent, full_context, "writer_app")
+            draft_report = await self._execute_agent(get_writer_agent(self.output_format), full_context, "writer_app")
             
             # 4. REVIEW (Feedback Loop) - runs for ALL modes
             sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
@@ -255,7 +256,7 @@ class Orchestrator:
                 Original Context:
                 {full_context}
                 """
-                final_report = await self._execute_agent(writer_agent, revision_prompt, "writer_app_revision")
+                final_report = await self._execute_agent(get_writer_agent(self.output_format), revision_prompt, "writer_app_revision")
             else:
                 sys.stderr.write("[Orchestrator] Review passed.\n")
                 final_report = draft_report

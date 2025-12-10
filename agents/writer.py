@@ -1,16 +1,16 @@
 """
 Writer Agent - The Synthesizer
 
-Role: Aggregates research findings into a comprehensive Markdown report.
+Role: Aggregates research findings into a comprehensive report.
 Input: Research context with findings and source URLs.
-Output: Structured report with Executive Summary, Key Findings, Analysis, and Sources.
+Output: Structured report (Markdown default, or JSON/custom format if specified).
 
 Uses Chain of Density prompting to maximize information value.
 CRITICAL: Sources section must contain REAL URLs from research notes.
 """
 from google.adk.agents import LlmAgent
 
-WRITER_PROMPT = """
+WRITER_PROMPT_MARKDOWN = """
 You are a technical writer for the Gemini CLI. Your goal is to convert research notes into a beautiful, structured Markdown report.
 
 CRITICAL: The "Sources" section MUST contain REAL URLs from the research notes. If a note says "Source: https://example.com", you MUST include that exact URL.
@@ -49,9 +49,56 @@ IMPORTANT: Use the ACTUAL URLs from the research notes. Do NOT make up URLs or u
 If no URLs were provided, note "Source URLs were not available in the research data."
 """
 
-writer_agent = LlmAgent(
-    name="writer",
-    model="gemini-3-pro-preview",
-    static_instruction=WRITER_PROMPT
-)
+WRITER_PROMPT_JSON = """
+You are a data engineer. Your goal is to convert research notes into a structured JSON response.
 
+CRITICAL: Output ONLY valid JSON. No markdown, no explanations, just JSON.
+
+Use the following schema EXACTLY:
+{
+  "topic": "The research topic",
+  "executive_summary": "A concise 3-5 sentence TL;DR",
+  "key_findings": [
+    {"finding": "Discovery description", "importance": "Why it matters"}
+  ],
+  "detailed_analysis": [
+    {"section": "Topic name", "content": "Detailed text", "facts": ["fact1", "fact2"]}
+  ],
+  "limitations": ["List of gaps or unverified information"],
+  "sources": ["https://real-url-1.com", "https://real-url-2.com"]
+}
+
+IMPORTANT: The "sources" array MUST contain REAL URLs from the research notes. Do NOT make up URLs.
+"""
+
+def get_writer_agent(output_format: str = "markdown"):
+    """
+    Factory function to create a Writer agent with the specified output format.
+    
+    Args:
+        output_format: "markdown" (default), "json", or a custom format instruction.
+    """
+    if output_format.lower() == "json":
+        prompt = WRITER_PROMPT_JSON
+    elif output_format.lower() == "markdown":
+        prompt = WRITER_PROMPT_MARKDOWN
+    else:
+        # Custom format - use the output_format as the instruction
+        prompt = f"""
+You are a technical writer. Your goal is to convert research notes into the requested format.
+
+OUTPUT FORMAT REQUIREMENT:
+{output_format}
+
+CRITICAL: Include REAL URLs from the research notes in your output. Do NOT make up URLs.
+If the format specifies a schema, follow it exactly.
+"""
+
+    return LlmAgent(
+        name="writer",
+        model="gemini-3-pro-preview",
+        static_instruction=prompt
+    )
+
+# Backward compatibility - default markdown writer
+writer_agent = get_writer_agent("markdown")
