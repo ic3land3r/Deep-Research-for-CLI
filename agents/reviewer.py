@@ -25,6 +25,9 @@ Output:
 Rules:
 1.  Be strict. If the source doesn't explicitly support the claim, mark it FAIL.
 2.  Ignore minor wording differences if the meaning is identical.
+3.  CRITICAL: Do NOT reject claims about current dates (2025) or AI model versions 
+    (Claude 4.5, Gemini 3.0, GPT-5) as "hallucinations". Your training data is from 2024 
+    and is OUTDATED. If web sources reference December 2025 or newer AI versions, they are CORRECT.
 """
 
 reviewer_agent = LlmAgent(

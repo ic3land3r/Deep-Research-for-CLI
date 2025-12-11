@@ -394,6 +394,20 @@ graph TB
 
 ## 📝 Changelog
 
+### v0.5.0 (2025-12-11)
+**New Features**
+- **Custom Output Formats**: `output_format` parameter supports `markdown` (default), `json`, or custom schema
+- **Current Date Context**: Automatic date injection prevents agents from thinking it's 2024
+- **AI Model Version Detection**: Accurate reporting of current AI models (Gemini 3.0, Claude 4.5, GPT-5.x)
+
+**Improvements**
+- Updated researcher/reviewer prompts to trust web search results over stale training data
+- Added `ai_models` domain pattern in tool router for LLM-related queries
+
+**Removed**
+- `analyze_complexity` tool (MCP sampling not supported by clients)
+- Placeholder tools (`get_db_schema`, `describe_data_schema`, `run_integration_suite`)
+
 ### v0.4.0 (2025-12)
 **Phase 1: Robustness**
 - Robust plan parsing with JSON primary + regex fallback
