@@ -5,6 +5,7 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
 from agents.planner import planner_agent
+from agents.intent_extractor import intent_extractor_agent
 from agents.researcher import get_researcher_agent
 from agents.writer import get_writer_agent
 from agents.reviewer import reviewer_agent
@@ -95,9 +96,22 @@ class Orchestrator:
                 sys.stderr.write("[Orchestrator] QUICK MODE: Skipping planning phase\n")
                 sub_questions = [topic_with_context]
             else:
+                # 0. INTENT EXTRACTION
+                sys.stderr.write("[Orchestrator] Phase 0: Extracting Intent...\n")
+                # Intent Extractor gets the raw topic (without date context) to avoid confusing the "clarification" logic,
+                # but we can pass the context if we want it to be date-aware. 
+                # Let's pass the context version so it knows the date (e.g. "2025").
+                refined_goal = await self._execute_agent(intent_extractor_agent, topic_with_context, "intent_extractor_app")
+                sys.stderr.write(f"[Orchestrator] Refined Goal: {refined_goal}\n")
+                
+                # Update the topic for the Planner to use this refined goal
+                # We prepend current date context again just to be safe if the agent dropped it, 
+                # or we can trust the agent. Let's reconstruct it to ensure consistency.
+                planner_input = f"[CURRENT DATE: {current_date}] {refined_goal}"
+
                 # 1. PLAN (standard and deep modes)
                 sys.stderr.write("[Orchestrator] Phase 1: Planning...\n")
-                plan_text = await self._execute_agent(planner_agent, topic_with_context, "planner_app")
+                plan_text = await self._execute_agent(planner_agent, planner_input, "planner_app")
                 
                 # Parse structured JSON output from Planner (with regex fallback)
                 sub_questions = []

@@ -11,6 +11,7 @@ The system implements a **Level 3 Autonomous Agent** architecture, featuring hie
 | Component | Role | Implementation Details |
 | :--- | :--- | :--- |
 | **Orchestrator** | **The Controller** | Manages the lifecycle of the research request. It initializes the session, coordinates agent execution, manages the Vector DB, and enforces the feedback loop. |
+| **Intent Extractor** | **The Clarifier** | Analyzes vague user queries (e.g., "batteries") and transforms them into specific, context-aware research goals before planning begins. |
 | **Planner Agent** | **The Strategist** | Decomposes complex user queries into a Directed Acyclic Graph (DAG) of sub-questions. Uses `gemini-3-pro-preview` for reasoning. |
 | **Researcher Agent** | **The Worker** | Executed in **PARALLEL** for each sub-question. Delegates search to the Host via `ask_host_for_info` (since `google_search` is incompatible with Function Calling). |
 | **Memory Layer** | **The Context** | A **Session-Scoped Vector Database** (ChromaDB) that stores research notes. It allows the Writer to retrieve semantically relevant information based on the topic. |
@@ -21,12 +22,13 @@ The system implements a **Level 3 Autonomous Agent** architecture, featuring hie
 
 The workflow follows a strict **Plan -> Research -> Write -> Review** cycle:
 
-1.  **Initialization**: The `Orchestrator` creates a fresh `Memory` instance (wiped after execution).
-2.  **Planning Phase**: The `Planner` breaks the topic into $N$ sub-questions.
-3.  **Research Phase (Parallel)**:
+1.  **Initialization**: The `Orchestrator` creates a fresh `Memory` instance.
+2.  **Intent Extraction**: The `IntentExtractor` refines the user's raw topic into a clear research goal.
+3.  **Planning Phase**: The `Planner` breaks the refined goal into $N$ sub-questions.
+4.  **Research Phase (Parallel)**:
     *   The `Orchestrator` spawns $N$ concurrent `Researcher` tasks.
     *   Each researcher gathers data and calls `memory.add()` to store findings.
-4.  **Synthesis Phase**:
+5.  **Synthesis Phase**:
     *   The `Orchestrator` queries `Memory` for the top $K$ relevant chunks.
     *   The `Writer` generates a `draft_report`.
 5.  **Verification Phase (Feedback Loop)**:
@@ -54,8 +56,12 @@ sequenceDiagram
     Host->>Server: perform_deep_research(topic="X")
     Server->>Orch: start_research()
     
+    %% Intent Extraction
+    Orch->>Intent: clarify_intent(topic)
+    Intent-->>Orch: Refined Goal
+
     %% Planning Phase
-    Orch->>Plan: generate_plan(topic)
+    Orch->>Plan: generate_plan(refined_goal)
     Plan-->>Orch: Research Plan
 
     %% Research Phase (Loop)
@@ -393,6 +399,10 @@ graph TB
 ---
 
 ## 📝 Changelog
+
+### v0.6.0 (2025-12-12)
+**New Features**
+- **Intent Extraction**: New `IntentExtractor` agent automatically clarifies vague queries (e.g., "batteries" -> "Current state of battery technology...") before research begins.
 
 ### v0.5.0 (2025-12-11)
 **New Features**
