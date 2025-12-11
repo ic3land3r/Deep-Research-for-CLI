@@ -107,6 +107,7 @@ graph TD
     
     subgraph "Deep Research Server"
         Server --> Orch[Orchestrator]
+        Orch --> Intent[Intent Extractor]
         Orch --> Planner[Planner Agent]
         Orch --> Researcher[Researcher Agent]
         Orch --> Writer[Writer Agent]
@@ -367,6 +368,7 @@ graph TB
     end
     
     subgraph "Agent Layer"
+        Orch --> Intent[Intent Extractor]
         Orch --> Plan[Planner Agent]
         Orch --> Res[Researcher Agent]
         Orch --> Write[Writer Agent]
