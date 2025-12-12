@@ -15,5 +15,3 @@ dependencies = [
 
 # NOTE: For standalone clones outside the ADK monorepo, remove or comment out this section
 # and the project will use google-adk from PyPI instead.
-[tool.uv.sources]
-google-adk = { workspace = true }

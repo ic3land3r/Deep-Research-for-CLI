@@ -19,11 +19,11 @@ async def perform_deep_research(
     Args:
         ctx: The FastMCP context.
         topic: The research topic or question.
-        mode: Research mode - "quick" (fast, grounded search), "standard" (balanced), or "deep" (thorough, forced deep dive).
+        mode: Research mode - "quick", "standard", "deep", or "google_deep".
         output_format: Output format - "markdown" (default report), "json" (structured JSON), or a custom format instruction like "json with schema: {title: str, summary: str, facts: list}".
     """
     # Validate mode
-    valid_modes = ["quick", "standard", "deep"]
+    valid_modes = ["quick", "standard", "deep", "google_deep"]
     if mode not in valid_modes:
         return f"Invalid mode '{mode}'. Must be one of: {valid_modes}"
     

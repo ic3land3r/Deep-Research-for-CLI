@@ -17,6 +17,7 @@ from utils.tool_router import augment_prompt_with_routing, detect_domain
 from utils.finance_tools import create_finance_tool
 from utils.academic_tools import create_arxiv_tool, create_openalex_tool
 from utils.macro_news_tools import create_world_bank_tool, create_news_rss_tool
+from utils.google_deep_research_client import GoogleDeepResearchClient
 
 def extract_sources_from_researcher_output(text: str) -> list[str]:
     """Parses researcher output to extract source URLs."""
@@ -91,6 +92,12 @@ class Orchestrator:
         self.memory.clear() # Ensure fresh memory for this run
 
         try:
+            # MODE: google_deep - delegate to Google's Deep Research Agent
+            if self.mode == "google_deep":
+                sys.stderr.write("[Orchestrator] GOOGLE DEEP MODE: Delegating to Google Deep Research Agent\n")
+                client = GoogleDeepResearchClient()
+                return await client.execute(topic, self.output_format)
+
             # MODE: quick - skip planning, treat topic as single query
             if self.mode == "quick":
                 sys.stderr.write("[Orchestrator] QUICK MODE: Skipping planning phase\n")
