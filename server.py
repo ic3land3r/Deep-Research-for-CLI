@@ -10,25 +10,32 @@ mcp = FastMCP("Deep Research")
 async def perform_deep_research(
     ctx: Context, 
     topic: str, 
-    mode: str = "standard",
-    output_format: str = "markdown"
+    mode: str = "hybrid",  # Default changed to hybrid for best experience
+    output_format: str = "markdown",
+    local_intensity: str = "standard"
 ) -> str:
     """
-    Performs a deep, multi-step research on a given topic using Gemini 3.0 Pro.
+    Performs a deep, multi-step research on a given topic using Hybrid Intelligence.
     
     Args:
         ctx: The FastMCP context.
         topic: The research topic or question.
-        mode: Research mode - "quick" (fast, grounded search), "standard" (balanced), or "deep" (thorough, forced deep dive).
-        output_format: Output format - "markdown" (default report), "json" (structured JSON), or a custom format instruction like "json with schema: {title: str, summary: str, facts: list}".
+        mode: Research mode - "hybrid" (smart routing), "quick" (local fast), "standard" (local thorough), or "deep" (managed agent).
+        output_format: Output format - "markdown" (default report), "json" (structured JSON), or a custom format instruction.
+        local_intensity: For hybrid/local modes, controls depth: "simple" (fast tools) or "standard" (plan+review).
     """
     # Validate mode
-    valid_modes = ["quick", "standard", "deep"]
+    valid_modes = ["quick", "standard", "deep", "hybrid"]
     if mode not in valid_modes:
         return f"Invalid mode '{mode}'. Must be one of: {valid_modes}"
     
     try:
-        orchestrator = Orchestrator(ctx=ctx, mode=mode, output_format=output_format)
+        orchestrator = Orchestrator(
+            ctx=ctx, 
+            mode=mode, 
+            output_format=output_format,
+            local_intensity=local_intensity
+        )
         result = await orchestrator.run(topic)
         return result
     except (ConnectionError, TimeoutError, asyncio.TimeoutError) as e:

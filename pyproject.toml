@@ -1,19 +1,14 @@
 [project]
-name = "adk-deep-research"
-version = "0.1.0"
-description = "Add your description here"
+name = "deep-research-for-cli"
+version = "0.7.0"
+description = "Deep Research MCP Server for Gemini CLI"
 readme = "README.md"
 requires-python = ">=3.10, <3.14"
 dependencies = [
     "chromadb>=1.1.1",
     "fastmcp>=2.13.1",
     "google-adk>=0.3.0",
-    "google-genai>=1.51.0",
+    "google-genai>=1.55.0",
     "yfinance>=0.2.50",
     "pandas>=2.0.0",
 ]
-
-# NOTE: For standalone clones outside the ADK monorepo, remove or comment out this section
-# and the project will use google-adk from PyPI instead.
-[tool.uv.sources]
-google-adk = { workspace = true }

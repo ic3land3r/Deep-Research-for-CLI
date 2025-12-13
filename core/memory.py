@@ -1,5 +1,11 @@
-import chromadb
-from chromadb.utils import embedding_functions
+try:
+    import chromadb
+    from chromadb.utils import embedding_functions
+    _HAS_CHROMA = True
+except ImportError:
+    chromadb = None
+    embedding_functions = None
+    _HAS_CHROMA = False
 from dataclasses import dataclass
 from typing import Optional
 import uuid
@@ -14,39 +20,36 @@ class MemoryChunk:
 class Memory:
     """Session-scoped vector memory with efficient clearing via session_id metadata."""
     
-    # Shared client and collection across all Memory instances
-    _client: chromadb.Client = None
+    _client = None
     _collection = None
     
     def __init__(self, session_id: str = None):
-        """Initialize memory with a session ID for scoping.
-        
-        Args:
-            session_id: Unique session identifier. Auto-generated if not provided.
-        """
-        # Lazy initialization of shared client
-        if Memory._client is None:
-            Memory._client = chromadb.Client()
-            Memory._collection = Memory._client.get_or_create_collection(name="research_sessions")
+        global _HAS_CHROMA
+        if _HAS_CHROMA:
+            if Memory._client is None:
+                try:
+                    Memory._client = chromadb.Client()
+                    Memory._collection = Memory._client.get_or_create_collection(name="research_sessions")
+                except Exception as e:
+                    print(f"Warning: Failed to init ChromaDB: {e}")
+                    _HAS_CHROMA = False
         
         self.session_id = session_id or str(uuid.uuid4())
         self._doc_counter = 0
         
-        # Use default embedding function (all-MiniLM-L6-v2)
-        # NOTE: For air-gapped environments, consider using host embedding API
-        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+        if _HAS_CHROMA:
+            try:
+                self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+            except Exception:
+                self.embedding_fn = None
 
     def add(self, text: str, source_url: str = None, topic: str = None):
-        """Adds a text chunk to the memory with source tracking.
-        
-        Args:
-            text: The content to store.
-            source_url: The URL where this information was found.
-            topic: The sub-question this chunk answers.
-        """
         if not text:
             return
         
+        if not _HAS_CHROMA:
+            return
+
         self._doc_counter += 1
         doc_id = f"{self.session_id}_{self._doc_counter}"
         metadata = {
@@ -54,30 +57,28 @@ class Memory:
             "source_url": source_url or "internal://research-notes",
             "topic": topic or "general"
         }
-        Memory._collection.add(
-            documents=[text],
-            metadatas=[metadata],
-            ids=[doc_id]
-        )
+        try:
+            Memory._collection.add(
+                documents=[text],
+                metadatas=[metadata],
+                ids=[doc_id]
+            )
+        except Exception:
+            pass
 
     def query(self, query_text: str, n_results: int = 3) -> list[MemoryChunk]:
-        """Retrieves relevant context for a query WITH source information.
-        
-        Only returns results from the current session.
-        
-        Returns:
-            List of MemoryChunk objects containing text and source URLs.
-        """
-        if Memory._collection.count() == 0:
+        if not _HAS_CHROMA or Memory._collection is None or Memory._collection.count() == 0:
             return []
         
-        # Filter by session_id to only get results from this session
-        results = Memory._collection.query(
-            query_texts=[query_text],
-            n_results=n_results,
-            where={"session_id": self.session_id},
-            include=["documents", "metadatas"]
-        )
+        try:
+            results = Memory._collection.query(
+                query_texts=[query_text],
+                n_results=n_results,
+                where={"session_id": self.session_id},
+                include=["documents", "metadatas"]
+            )
+        except Exception:
+            return []
         
         chunks = []
         if results['documents'] and results['documents'][0]:
@@ -91,11 +92,9 @@ class Memory:
         return chunks
 
     def clear(self):
-        """Clears memory for current session only (efficient - no collection recreation)."""
-        if Memory._collection.count() == 0:
+        if not _HAS_CHROMA or Memory._collection is None or Memory._collection.count() == 0:
             return
             
-        # Get all document IDs for this session
         try:
             results = Memory._collection.get(
                 where={"session_id": self.session_id},
@@ -104,7 +103,6 @@ class Memory:
             if results['ids']:
                 Memory._collection.delete(ids=results['ids'])
         except Exception:
-            # Collection might be empty or have no matching documents
             pass
         
         self._doc_counter = 0

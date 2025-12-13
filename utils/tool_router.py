@@ -1,69 +1,75 @@
 """
 Tool Router: Routes domain-specific queries to specialized data sources.
-
-This module provides a middleware layer that augments the researcher with hints
-about where to find authoritative data for specific domains.
 """
 
 import re
-from typing import Optional
+from typing import Optional, Literal
 
-# Domain patterns and their recommended data sources
+ExecutionMode = Literal["local", "managed"]
+
 DOMAIN_PATTERNS = [
     {
-        "name": "technical_analysis",
-        "patterns": [r"RSI", r"MACD", r"moving average", r"support", r"resistance", r"bollinger", r"technical indicator", r"overbought", r"oversold"],
+        "name": "finance_simple",
+        "patterns": [
+            r"price of", r"stock price", r"quote for", r"current value", 
+            r"market cap", r"beta", r"pe ratio", r"dividend yield",
+            r"RSI", r"MACD", r"moving average", r"technical indicator"
+        ],
         "sources": ["yfinance (local)", "TradingView"],
-        "hint": "For technical analysis, use the get_financial_data tool with data_type='technical' to get RSI, MACD, and Moving Averages.",
-        "tool": "get_financial_data"
+        "hint": "Use get_financial_data for specific metrics/quotes.",
+        "tool": "get_financial_data",
+        "execution_mode": "local"
     },
     {
-        "name": "finance",
-        "patterns": [r"stock", r"market", r"invest", r"portfolio", r"dividend", r"earnings", r"valuation", r"P/E", r"price target"],
-        "sources": ["Yahoo Finance (via yfinance)", "SEC EDGAR", "Federal Reserve (FRED)"],
-        "hint": "For financial data, use the get_financial_data tool to get fundamentals, quotes, or ask the host for SEC filings.",
-        "tool": "get_financial_data"
+        "name": "finance_complex",
+        "patterns": [
+            r"compare", r"evaluate", r"outlook", r"forecast", r"analysis of",
+            r"why is", r"impact of", r"strategy", r"competitor", r"vs",
+            r"financial crisis", r"history of", r"bull case", r"bear case"
+        ],
+        "sources": ["SEC EDGAR", "News Analysis", "Historical Data"],
+        "hint": "Complex analysis requires Deep Research.",
+        "execution_mode": "managed"
     },
     {
         "name": "science",
         "patterns": [r"research paper", r"study shows", r"peer.?review", r"published", r"journal"],
         "sources": ["arXiv", "Semantic Scholar", "PubMed"],
-        "hint": "For scientific research, ask the host to search arXiv.org or Semantic Scholar."
+        "hint": "Scientific research benefits from Deep Research reasoning.",
+        "execution_mode": "managed" 
     },
     {
         "name": "technology",
         "patterns": [r"github", r"repository", r"open.?source", r"library", r"framework"],
         "sources": ["GitHub API", "NPM Registry", "PyPI"],
-        "hint": "For software/tech data, ask the host to query GitHub or package registries."
+        "hint": "For software/tech data, ask the host to query GitHub or package registries.",
+        "execution_mode": "local" 
     },
     {
         "name": "government",
         "patterns": [r"regulation", r"law", r"policy", r"congress", r"senate", r"federal"],
         "sources": ["Congress.gov", "Federal Register", "Regulations.gov"],
-        "hint": "For government/policy data, ask the host to check Congress.gov or Federal Register."
+        "hint": "Policy analysis requires Deep Research.",
+        "execution_mode": "managed"
     },
     {
         "name": "realtime",
-        "patterns": [r"today", r"current", r"latest", r"2024", r"2025", r"breaking"],
+        "patterns": [r"today", r"current", r"latest", r"2024", r"2025", r"breaking", r"news"],
         "sources": ["Google News", "Reuters RSS", "Twitter/X"],
-        "hint": "For real-time news, ask the host to perform a web search with date filters."
+        "hint": "Use news tools for real-time updates.",
+        "execution_mode": "local"
     },
     {
         "name": "ai_models",
         "patterns": [r"gemini", r"gpt.?4", r"gpt.?5", r"claude", r"llama", r"mistral", r"openai", r"anthropic", r"language model", r"LLM version"],
-        "sources": ["Google AI Blog", "OpenAI Blog", "Anthropic Blog", "Hugging Face"],
-        "hint": "IMPORTANT: AI model versions change rapidly. Training data may be stale. You MUST search the web for the LATEST version info. Current Gemini version is 3.0 Pro (not 1.5). Always verify with a live web search.",
+        "sources": ["Google AI Blog", "OpenAI Blog"],
+        "hint": "AI model specs change fast. Use Deep Research for latest verification.",
+        "execution_mode": "managed",
         "force_search": True
     }
 ]
 
 def detect_domain(query: str) -> Optional[dict]:
-    """
-    Analyzes a query to detect its domain and return routing hints.
-    
-    Returns:
-        A dictionary with domain info and hints, or None if no specific domain detected.
-    """
     query_lower = query.lower()
     
     for domain in DOMAIN_PATTERNS:
@@ -72,41 +78,22 @@ def detect_domain(query: str) -> Optional[dict]:
                 return {
                     "domain": domain["name"],
                     "sources": domain["sources"],
-                    "hint": domain["hint"]
+                    "hint": domain["hint"],
+                    "execution_mode": domain.get("execution_mode", "managed")
                 }
     
-    return None
+    return {
+        "domain": "general",
+        "sources": ["Google Search"],
+        "hint": "General topic.",
+        "execution_mode": "managed"
+    }
 
 def augment_prompt_with_routing(question: str) -> str:
-    """
-    Augments a research question with domain-specific routing hints.
-    
-    Args:
-        question: The original research question.
-        
-    Returns:
-        The question with appended hints about where to find data.
-    """
     domain_info = detect_domain(question)
     
-    if domain_info:
+    if domain_info and domain_info.get("hint"):
         hint = f"\n\n[TOOL ROUTER HINT: This looks like a {domain_info['domain']} query. {domain_info['hint']}]"
         return f"{question}{hint}"
     
     return question
-
-
-if __name__ == "__main__":
-    # Test the router
-    test_queries = [
-        "What is the stock price of AAPL?",
-        "Find recent research papers on transformer models",
-        "What is the current inflation rate?",
-        "Explain the SEC filing requirements",
-    ]
-    
-    for q in test_queries:
-        result = detect_domain(q)
-        print(f"Query: {q}")
-        print(f"Domain: {result}")
-        print()

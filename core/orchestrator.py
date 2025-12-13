@@ -1,5 +1,7 @@
 import asyncio
 import re
+import sys
+from typing import Optional
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
@@ -9,6 +11,7 @@ from agents.intent_extractor import intent_extractor_agent
 from agents.researcher import get_researcher_agent
 from agents.writer import get_writer_agent
 from agents.reviewer import reviewer_agent
+from agents.managed_researcher import get_managed_researcher
 
 from core.memory import Memory
 
@@ -21,15 +24,12 @@ from utils.macro_news_tools import create_world_bank_tool, create_news_rss_tool
 def extract_sources_from_researcher_output(text: str) -> list[str]:
     """Parses researcher output to extract source URLs."""
     sources = []
-    # Look for SOURCES: section
     sources_match = re.search(r'SOURCES:\s*([\s\S]*?)(?:$|(?=\n\n))', text, re.IGNORECASE)
     if sources_match:
         sources_section = sources_match.group(1)
-        # Extract URLs from the section
         urls = re.findall(r'https?://[^\s\)\]]+', sources_section)
         sources.extend(urls)
     
-    # Also look for inline URLs throughout the text
     inline_urls = re.findall(r'https?://[^\s\)\]]+', text)
     for url in inline_urls:
         if url not in sources:
@@ -38,19 +38,20 @@ def extract_sources_from_researcher_output(text: str) -> list[str]:
     return sources if sources else ["internal://research-notes"]
 
 class Orchestrator:
-    def __init__(self, ctx=None, mode: str = "standard", output_format: str = "markdown"):
+    def __init__(self, ctx=None, mode: str = "hybrid", output_format: str = "markdown", local_intensity: str = "standard"):
         self.session_service = InMemorySessionService()
         self.memory = Memory()
         self.ctx = ctx
-        self.mode = mode  # "quick", "standard", or "deep"
-        self.output_format = output_format  # "markdown", "json", or custom format
+        self.mode = mode 
+        self.output_format = output_format
+        self.local_intensity = local_intensity
+        self.managed_agent = get_managed_researcher()
 
     async def _execute_agent(self, agent, prompt: str, app_name: str) -> str:
         """Helper to execute a single agent run."""
         user_id = "user"
         session_id = f"session_{app_name}"
         
-        # Ensure session exists
         try:
             await self.session_service.create_session(app_name=app_name, user_id=user_id, session_id=session_id)
         except Exception:
@@ -71,218 +72,134 @@ class Orchestrator:
         return response_text
 
     async def run(self, topic: str) -> str:
-        """
-        Executes the Deep Research workflow with mode-specific behavior.
-        
-        Modes:
-        - quick: Skip planning, single research pass, no deep dive, no review
-        - standard: Plan -> Research (conditional deep dive) -> Write -> Review
-        - deep: Plan -> Research (forced deep dive) -> Write -> Review
-        """
-        import sys
+        """Executes the Deep Research workflow with Hybrid Routing."""
         from datetime import datetime
         
-        # Add current date context to prevent date confusion
         current_date = datetime.now().strftime("%B %d, %Y")
         topic_with_context = f"[CURRENT DATE: {current_date}] {topic}"
         
         sys.stderr.write(f"[Orchestrator] Starting research on: {topic} (mode={self.mode})\n")
-        sys.stderr.write(f"[Orchestrator] Current date context: {current_date}\n")
-        self.memory.clear() # Ensure fresh memory for this run
+        
+        self.memory.clear() 
 
         try:
-            # MODE: quick - skip planning, treat topic as single query
-            if self.mode == "quick":
-                sys.stderr.write("[Orchestrator] QUICK MODE: Skipping planning phase\n")
-                sub_questions = [topic_with_context]
-            else:
-                # 0. INTENT EXTRACTION
-                sys.stderr.write("[Orchestrator] Phase 0: Extracting Intent...\n")
-                # Intent Extractor gets the raw topic (without date context) to avoid confusing the "clarification" logic,
-                # but we can pass the context if we want it to be date-aware. 
-                # Let's pass the context version so it knows the date (e.g. "2025").
-                refined_goal = await self._execute_agent(intent_extractor_agent, topic_with_context, "intent_extractor_app")
-                sys.stderr.write(f"[Orchestrator] Refined Goal: {refined_goal}\n")
+            # DEEP MODE: Delegate entirely to Managed Agent
+            if self.mode == "deep":
+                sys.stderr.write("[Orchestrator] DEEP MODE: Delegating entire task to Managed Agent.\n")
+                result = await self.managed_agent.execute(topic)
                 
-                # Update the topic for the Planner to use this refined goal
-                # We prepend current date context again just to be safe if the agent dropped it, 
-                # or we can trust the agent. Let's reconstruct it to ensure consistency.
-                planner_input = f"[CURRENT DATE: {current_date}] {refined_goal}"
+                if self.output_format.lower() == "json":
+                    sys.stderr.write("[Orchestrator] Formatting Managed output to JSON...\n")
+                    dummy_context = f"Topic: {topic}\n\nManaged Research Report:\n{result}"
+                    json_result = await self._execute_agent(get_writer_agent("json"), dummy_context, "writer_formatter")
+                    return json_result
+                return result
 
-                # 1. PLAN (standard and deep modes)
+            # PLANNING PHASE
+            sub_questions = [topic_with_context]
+            if self.mode != "quick":
                 sys.stderr.write("[Orchestrator] Phase 1: Planning...\n")
+                refined_goal = await self._execute_agent(intent_extractor_agent, topic_with_context, "intent_extractor_app")
+                
+                planner_input = f"[CURRENT DATE: {current_date}] {refined_goal}"
                 plan_text = await self._execute_agent(planner_agent, planner_input, "planner_app")
                 
-                # Parse structured JSON output from Planner (with regex fallback)
                 sub_questions = []
                 try:
                     import json
                     plan_data = json.loads(plan_text)
                     if isinstance(plan_data, dict) and "sub_questions" in plan_data:
                         sub_questions = plan_data["sub_questions"]
-                        sys.stderr.write(f"[Orchestrator] Parsed JSON plan: {sub_questions}\n")
-                except (json.JSONDecodeError, TypeError):
-                    # Fallback to regex parsing for non-JSON output
-                    sys.stderr.write("[Orchestrator] JSON parse failed, falling back to regex\n")
+                except Exception:
                     for line in plan_text.split("\n"):
-                        line = line.strip()
-                        match = re.match(r'^(?:[-*]|\d+\.)\s+(.+)$', line)
-                        if match:
-                            sub_questions.append(match.group(1).strip())
-                    sys.stderr.write(f"[Orchestrator] Regex parsed plan: {sub_questions}\n")
+                        match = re.match(r'^(?:[-*]|\d+\.)\s+(.+)$', line.strip())
+                        if match: sub_questions.append(match.group(1).strip())
+                
+                if not sub_questions: sub_questions = [topic]
 
-                if not sub_questions:
-                    sys.stderr.write("[Orchestrator] Failed to generate a valid plan. Falling back to single query.\n")
-                    sub_questions = [topic]
+            # EXECUTION PHASE (Hybrid Routing)
+            sys.stderr.write("[Orchestrator] Phase 2: Execution (Hybrid Routing)...\n")
+            
+            async def research_task(index, question):
+                router_result = detect_domain(question)
+                execution_mode = "local"
+                
+                if self.mode == "hybrid":
+                    if router_result:
+                         execution_mode = router_result.get("execution_mode", "local")
+                elif self.mode == "standard" or self.mode == "quick":
+                    execution_mode = "local"
+                
+                sys.stderr.write(f"[Orchestrator] Task {index+1}: '{question[:30]}...' -> Mode: {execution_mode}\n")
+                
+                note = ""
+                source_used = "internal"
+                
+                if execution_mode == "managed":
+                    note = await self.managed_agent.execute(question)
+                    source_used = "managed-deep-research"
+                else:
+                    extra_tools = []
+                    if self.ctx: extra_tools.append(create_ask_host_tool(self.ctx))
+                    
+                    if router_result:
+                        domain = router_result.get("domain")
+                        if domain in ("finance_simple", "finance_complex", "finance"):
+                            extra_tools.append(create_finance_tool())
+                        elif domain == "science":
+                            extra_tools.append(create_arxiv_tool())
+                            extra_tools.append(create_openalex_tool())
+                        elif domain in ("government", "realtime"):
+                            extra_tools.append(create_world_bank_tool())
+                            extra_tools.append(create_news_rss_tool())
 
-            # 2. RESEARCH (Parallel with Deep Dive for thin answers)
-            sys.stderr.write("[Orchestrator] Phase 2: Researching (Parallel with Deep Dive)...\n")
+                    agent = get_researcher_agent(extra_tools=extra_tools)
+                    augmented_q = augment_prompt_with_routing(question)
+                    
+                    note = await self._execute_agent(agent, augmented_q, f"res_{index}")
+                    
+                    # Escalation check
+                    if len(note) < 300 and self.mode == "hybrid":
+                        sys.stderr.write(f"[Orchestrator] WARNING: Local result thin ({len(note)} chars). ESCALATING to Managed Agent.\n")
+                        note = await self.managed_agent.execute(question)
+                        source_used = "managed-escalation"
+                    
+                    sources = extract_sources_from_researcher_output(note)
+                    source_used = sources[0] if sources else "local"
 
-            
-            # Configuration for Deep Dive (HYBRID: char count + fact density)
-            MIN_CHARS_THRESHOLD = 300  # Raised threshold
-            MIN_FACTS_THRESHOLD = 3    # Minimum bullet points, stats, or URLs
-            MAX_DEEP_DIVE_DEPTH = 1    # Maximum recursion depth
-            
-            def count_facts(text: str) -> int:
-                """Count substantive facts in researcher output."""
-                import re
-                bullets = len(re.findall(r'^[\s]*[-*•]\s', text, re.MULTILINE))  # Bullet points
-                stats = len(re.findall(r'\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?[BMK]?|\d{4}', text))  # Percentages, money, years
-                urls = len(re.findall(r'https?://', text))  # URLs
-                return bullets + stats + urls
-            
-            def is_thin_answer(text: str) -> bool:
-                """Determine if answer lacks substance (hybrid metric)."""
-                char_count = len(text)
-                fact_count = count_facts(text)
-                is_thin = char_count < MIN_CHARS_THRESHOLD or fact_count < MIN_FACTS_THRESHOLD
-                return is_thin, char_count, fact_count
-            
-            # Define a helper for parallel execution with deep dive
-            async def research_task(index, question, depth=0):
-                sys.stderr.write(f"[Orchestrator] Research sub-topic {index+1} (depth {depth}): {question}\n")
-                
-                # Create a researcher agent with access to the host tool if context is available
-                extra_tools = []
-                if self.ctx:
-                    extra_tools.append(create_ask_host_tool(self.ctx))
-                
-                # CONDITIONAL TOOL INJECTION: Add finance tool if domain matches
-                domain_info = detect_domain(question)
-                if domain_info and domain_info.get("domain") in ("technical_analysis", "finance"):
-                    sys.stderr.write(f"[Orchestrator] DOMAIN DETECTED: {domain_info['domain']} - injecting finance tool\n")
-                    extra_tools.append(create_finance_tool())
-                
-                # Add academic tools if science domain detected
-                if domain_info and domain_info.get("domain") == "science":
-                    sys.stderr.write(f"[Orchestrator] DOMAIN DETECTED: science - injecting arXiv + OpenAlex tools\n")
-                    extra_tools.append(create_arxiv_tool())
-                    extra_tools.append(create_openalex_tool())
-                
-                # Add macro/news tools if government or realtime domain detected
-                if domain_info and domain_info.get("domain") in ("government", "realtime"):
-                    sys.stderr.write(f"[Orchestrator] DOMAIN DETECTED: {domain_info['domain']} - injecting World Bank + News RSS tools\n")
-                    extra_tools.append(create_world_bank_tool())
-                    extra_tools.append(create_news_rss_tool())
-                
-                agent = get_researcher_agent(extra_tools=extra_tools)
-                
-                # IMPROVEMENT C: Augment question with domain-specific routing hints
-                augmented_question = augment_prompt_with_routing(question)
-                
-                note = await self._execute_agent(agent, augmented_question, f"researcher_app_{index}_d{depth}")
-                
-                # Deep Dive: MODE-AWARE behavior
-                # - quick: NEVER deep dive
-                # - standard: Conditional (hybrid metric)
-                # - deep: ALWAYS deep dive
-                should_deep_dive = False
-                
-                if self.mode == "deep":
-                    # Force deep dive in deep mode
-                    should_deep_dive = depth < MAX_DEEP_DIVE_DEPTH
-                    if should_deep_dive:
-                        sys.stderr.write(f"[Orchestrator] DEEP MODE: Forcing deep dive for '{question}'\n")
-                elif self.mode == "standard":
-                    # Use hybrid metric
-                    thin, chars, facts = is_thin_answer(note)
-                    should_deep_dive = thin and depth < MAX_DEEP_DIVE_DEPTH
-                    if should_deep_dive:
-                        sys.stderr.write(f"[Orchestrator] DEEP DIVE triggered for '{question}' (chars={chars}, facts={facts})\n")
-                # quick mode: should_deep_dive stays False
-                
-                if should_deep_dive:
-                    # Generate a more specific follow-up question
-                    follow_up = f"Provide MORE DETAILED information about: {question}. Include specific facts, data, and statistics."
-                    deep_note = await self._execute_agent(agent, follow_up, f"researcher_app_{index}_deep")
-                    note = f"{note}\n\n[DEEP DIVE EXPANSION]\n{deep_note}"
-                
-                # Extract sources from the researcher's output
-                sources = extract_sources_from_researcher_output(note)
-                primary_source = sources[0] if sources else "internal://research-notes"
-                
-                # Store with source URL tracking
-                self.memory.add(
-                    text=note,
-                    source_url=primary_source,
-                    topic=question
-                )
-                sys.stderr.write(f"[Orchestrator] Finished sub-topic {index+1}. Stored {len(note)} chars. Source: {primary_source}\n")
-                return f"### Sub-topic: {question}\n{note}"
+                self.memory.add(text=note, source_url=source_used, topic=question)
+                return note
 
-            # Execute all tasks concurrently with graceful failure handling
-            results = await asyncio.gather(
-                *[research_task(i, q) for i, q in enumerate(sub_questions)],
-                return_exceptions=True
+            await asyncio.gather(*[research_task(i, q) for i, q in enumerate(sub_questions)])
+
+            # WRITING PHASE
+            sys.stderr.write("[Orchestrator] Phase 3: Writing...\n")
+            memory_chunks = self.memory.query(topic, n_results=15)
+            
+            context_str = "\n".join([f"Source: {c.source_url}\nContent:\n{c.text or ''}" for c in memory_chunks])
+            
+            draft_report = await self._execute_agent(
+                get_writer_agent(self.output_format),
+                f"Topic: {topic}\n\nContext:\n{context_str}", 
+                "writer_app"
             )
             
-            # Log any failures but continue with partial results
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    sys.stderr.write(f"[Orchestrator] Research task {i+1} failed: {result}\n")
+            # REVIEW PHASE
+            if self.mode != "quick":
+                sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
+                review = await self._execute_agent(reviewer_agent, f"Review:\n{draft_report}", "reviewer")
+                
+                if "FAIL" in review:
+                    sys.stderr.write("[Orchestrator] Review FAILED. Escalating to Managed Agent for verification.\n")
+                    if self.mode in ("hybrid", "standard"):
+                         final_report = await self.managed_agent.execute(f"Verify and rewrite this report on {topic}. The draft had issues: {review}. \nDraft:\n{draft_report}")
+                         if self.output_format == "json":
+                             final_report = await self._execute_agent(get_writer_agent("json"), f"Convert to JSON:\n{final_report}", "fmt")
+                         return final_report
+                    else:
+                        return draft_report
+                        
+            return draft_report
 
-            # 3. WRITE
-            sys.stderr.write("[Orchestrator] Phase 3: Writing...\n")
-            memory_chunks = self.memory.query(topic, n_results=10)
-            
-            # Build context with explicit source citations
-            context_parts = [f"Original Topic: {topic}\n\nResearch Notes (with Sources):"]
-            for chunk in memory_chunks:
-                context_parts.append(f"\n---\nTopic: {chunk.topic}\nSource URL: {chunk.source_url}\nContent:\n{chunk.text}")
-            
-            full_context = "\n".join(context_parts)
-            
-            draft_report = await self._execute_agent(get_writer_agent(self.output_format), full_context, "writer_app")
-            
-            # 4. REVIEW (Feedback Loop) - runs for ALL modes
-            sys.stderr.write("[Orchestrator] Phase 4: Reviewing...\n")
-            
-            review_prompt = f"""
-            Review the following report for accuracy and completeness based on the topic '{topic}'.
-            Report:
-            {draft_report}
-            """
-            review_result = await self._execute_agent(reviewer_agent, review_prompt, "reviewer_app")
-            
-            if "FAIL" in review_result:
-                sys.stderr.write("[Orchestrator] Review failed. Revising...\n")
-                sys.stderr.write(f"[Orchestrator] Feedback: {review_result}\n")
-                
-                revision_prompt = f"""
-                The previous draft was rejected.
-                Feedback: {review_result}
-                
-                Please rewrite the report to address this feedback.
-                Original Context:
-                {full_context}
-                """
-                final_report = await self._execute_agent(get_writer_agent(self.output_format), revision_prompt, "writer_app_revision")
-            else:
-                sys.stderr.write("[Orchestrator] Review passed.\n")
-                final_report = draft_report
-            
-            return final_report
         finally:
-            self.memory.clear() # Wipe memory after run
-
+            self.memory.clear()
